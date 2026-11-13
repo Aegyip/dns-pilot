@@ -22,6 +22,8 @@ namespace DnsDegistirici
     {
         [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
         static extern int GetCurrentPackageFullName(ref int length, StringBuilder name);
+        [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+        static extern int GetCurrentPackageFamilyName(ref int length, StringBuilder name);
 
         // MSIX paketi olarak mı çalışıyoruz? (APPMODEL_ERROR_NO_PACKAGE = 15700)
         public static readonly bool Packaged = DetectPackaged();
@@ -45,12 +47,31 @@ namespace DnsDegistirici
             catch (Exception) { return false; } // Windows 7: API yok
         }
 
+        // Pakette AppData yazımları zaten paketin özel klasörüne yönlendirilir. Gerçek yolu doğrudan
+        // kullanırız ki Dosya Gezgini (paket dışı süreç) ve Not Defteri aynı dosyaları görsün.
         static string ResolveAppDir()
         {
             if (!Packaged) return InstallDir;
-            string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DNS Pilot");
+            string local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            string family = PackageFamilyName();
+            string dir = family != null
+                ? Path.Combine(local, "Packages", family, "LocalCache", "Local", "DNS Pilot")
+                : Path.Combine(local, "DNS Pilot");
             Directory.CreateDirectory(dir);
             return dir;
+        }
+
+        public static string PackageFamilyName()
+        {
+            try
+            {
+                int len = 0;
+                GetCurrentPackageFamilyName(ref len, null);
+                if (len <= 0) return null;
+                var sb = new StringBuilder(len);
+                return GetCurrentPackageFamilyName(ref len, sb) == 0 ? sb.ToString() : null;
+            }
+            catch (Exception) { return null; }
         }
 
         public static string Get(string key, string fallback)

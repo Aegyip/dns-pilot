@@ -442,9 +442,32 @@ namespace DnsDegistirici
                     .OnClick((o, e) => OpenInNotepad(Zapret.StrategiesPath)));
         }
 
+        // Store sürümü: uygulama ve Zapret motoru birlikte paketlenir, güncellemeleri Microsoft Store dağıtır.
+        void BuildStoreUpdates(StackPanel s)
+        {
+            Action openStore = () =>
+            {
+                try { Process.Start("ms-windows-store://downloadsandupdates"); } catch (Exception) { }
+            };
+            var hero = new SettingCard("", "Güncellemeler Microsoft Store'dan gelir",
+                "DNS Pilot ve Zapret motoru birlikte güncellenir. Yeni sürümler Microsoft Store tarafından otomatik olarak yüklenir.",
+                Button("Store'u aç", openStore, true, true));
+            hero.Large = true;
+            hero.GlyphColor = Ui.P.Accent;
+            Group(s, Ui.D(16), hero);
+
+            Section(s, "Bileşenler");
+            string appVersion = typeof(SettingsForm).Assembly.GetName().Version.ToString(2);
+            Group(s, Ui.D(8),
+                new SettingCard("", "DNS Pilot", "Sürüm " + appVersion),
+                new SettingCard("", "Zapret motoru",
+                    "Sürüm " + ShortSha(Zapret.CurrentVersion()) + " · Kaynak: bol-van/zapret-win-bundle · Uygulamayla birlikte gelir"));
+        }
+
         // Windows Update düzeni: üstte durum kartı, altında bileşenler ve seçenekler.
         void BuildUpdates(StackPanel s)
         {
+            if (Settings.Packaged) { BuildStoreUpdates(s); return; }
             var u = app.Updates;
             string last = u.LastCheck.HasValue ? "Son denetim: " + UpdateState.FormatWhen(u.LastCheck.Value) : "Henüz denetim yapılmadı";
 

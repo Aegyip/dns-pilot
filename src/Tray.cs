@@ -127,6 +127,7 @@ namespace DnsDegistirici
         // Açılıştan bir dakika sonra, son denetimin üzerinden bir gün geçtiyse güncellemeleri sessizce denetle.
         void ScheduleAutoUpdateCheck()
         {
+            if (Settings.Packaged) return; // Store sürümünde motor güncellemeleri Store ile gelir
             if (Settings.Get("guncelleme.otomatik", "1") != "1") return;
             var last = UpdateState.LoadLastCheck();
             if (last.HasValue && DateTime.Now - last.Value < TimeSpan.FromDays(1)) return;
@@ -606,17 +607,26 @@ namespace DnsDegistirici
     // Yönetici yetkisiyle sessizce başlamak için görev zamanlayıcı kullanılır (Run anahtarı UAC sorar).
     static class Autostart
     {
-        const string TaskName = "DnsDegistirici";
+        // Store sürümü ayrı bir görev adı kullanır; klasik kurulumla çakışmaz.
+        static readonly string TaskName = Settings.Packaged ? "DNSPilot" : "DnsDegistirici";
 
         public static bool IsEnabled()
         {
             return DnsManager.Run("schtasks.exe", "/query /tn " + TaskName, null) == 0;
         }
 
+        // Pakette exe yolu her güncellemede değişir; sabit uygulama takma adı (dnspilot.exe) kullanılır.
+        static string LaunchPath()
+        {
+            if (!Settings.Packaged) return Application.ExecutablePath;
+            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                                "Microsoft", "WindowsApps", "dnspilot.exe");
+        }
+
         public static string Enable()
         {
             string user = SecurityElement.Escape(WindowsIdentity.GetCurrent().Name);
-            string exe = SecurityElement.Escape(Application.ExecutablePath);
+            string exe = SecurityElement.Escape(LaunchPath());
             string xml =
 @"<?xml version=""1.0"" encoding=""UTF-16""?>
 <Task version=""1.2"" xmlns=""http://schemas.microsoft.com/windows/2004/02/mit/task"">

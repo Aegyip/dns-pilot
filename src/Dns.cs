@@ -35,8 +35,7 @@ namespace DnsDegistirici
 
     public static class ProfileStore
     {
-        public static readonly string FilePath =
-            Path.Combine(Path.GetDirectoryName(typeof(ProfileStore).Assembly.Location), "profiles.txt");
+        public static readonly string FilePath = Path.Combine(Settings.AppDir, "profiles.txt");
 
         const string Default =
 @"# DNS profilleri. Her satır:  Ad | IPv4 (virgülle) | IPv6 (virgülle, boş olabilir) | DoH şablonu (boş = şifresiz)

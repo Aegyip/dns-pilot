@@ -17,11 +17,41 @@ namespace DnsDegistirici
         public string Args;
     }
 
-    // Basit anahtar=değer ayar dosyası (exe'nin yanında ayarlar.txt).
+    // Basit anahtar=değer ayar dosyası (ayarlar.txt).
     public static class Settings
     {
-        public static readonly string AppDir = Path.GetDirectoryName(typeof(Settings).Assembly.Location);
+        [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+        static extern int GetCurrentPackageFullName(ref int length, StringBuilder name);
+
+        // MSIX paketi olarak mı çalışıyoruz? (APPMODEL_ERROR_NO_PACKAGE = 15700)
+        public static readonly bool Packaged = DetectPackaged();
+
+        // Exe'nin bulunduğu klasör. Pakette salt okunurdur.
+        public static readonly string InstallDir = Path.GetDirectoryName(typeof(Settings).Assembly.Location);
+
+        // Kullanıcı dosyalarının (ayarlar, profiller, listeler) klasörü.
+        // Klasik kurulumda exe'nin yanı; pakette %LOCALAPPDATA%\DNS Pilot.
+        public static readonly string AppDir = ResolveAppDir();
+
         static readonly string FilePath = Path.Combine(AppDir, "ayarlar.txt");
+
+        static bool DetectPackaged()
+        {
+            try
+            {
+                int len = 0;
+                return GetCurrentPackageFullName(ref len, null) != 15700;
+            }
+            catch (Exception) { return false; } // Windows 7: API yok
+        }
+
+        static string ResolveAppDir()
+        {
+            if (!Packaged) return InstallDir;
+            string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DNS Pilot");
+            Directory.CreateDirectory(dir);
+            return dir;
+        }
 
         public static string Get(string key, string fallback)
         {
@@ -58,12 +88,17 @@ namespace DnsDegistirici
 
         // motor\ güncellemede tümüyle değişir; kullanıcı dosyaları bir üst klasörde kalır.
         public static readonly string Dir = Path.Combine(Settings.AppDir, "zapret");
-        public static readonly string EngineDir = Path.Combine(Dir, "motor");
+        // Pakette motor, paketin içinde gelir (salt okunur; Store sürümüyle güncellenir).
+        public static readonly string EngineDir = Settings.Packaged
+            ? Path.Combine(Settings.InstallDir, "zapret", "motor")
+            : Path.Combine(Dir, "motor");
         public static readonly string HostlistPath = Path.Combine(Dir, "hostlist.txt");
         public static readonly string StrategiesPath = Path.Combine(Dir, "stratejiler.txt");
         static readonly string AutoHostlistPath = Path.Combine(Dir, "autohostlist.txt");
         static readonly string ExcludePath = Path.Combine(Dir, "excludelist.txt");
-        static readonly string VersionPath = Path.Combine(Dir, "surum.txt");
+        static readonly string VersionPath = Settings.Packaged
+            ? Path.Combine(Settings.InstallDir, "zapret", "surum.txt")
+            : Path.Combine(Dir, "surum.txt");
 
         static readonly StringBuilder output = new StringBuilder();
 

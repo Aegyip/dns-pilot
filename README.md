@@ -47,3 +47,14 @@ Klasörler:
 ```
 powershell -ExecutionPolicy Bypass -File build.ps1
 ```
+
+## Microsoft Store yayını
+- Partner Center ürünü: **DNS Pilot** (EXE/MSI uygulaması). Erişilebilirlik, Özellikler, Yaş derecelendirmesi ve Türkçe Store sayfası tamamlandı.
+- Kurucu: `powershell -ExecutionPolicy Bypass -File installer\build-setup.ps1` → `dist\DNSPilot-Setup-<sürüm>.exe`. Sessiz kurulum `/S`, sessiz kaldırma `/uninstall /S`.
+- Store görselleri: `store\` (Figma "My Project" → Branding sayfasından).
+- İndirme adresi (Cloudflare R2, bucket `dns-pilot-releases`): `https://pub-8381b8018eaa4b93a7d06321c7f3bf64.r2.dev/<sürüm>/DNSPilot-Setup-<sürüm>.exe`
+
+Göndermeden önce kalanlar:
+1. Kurucuyu kod imzalama sertifikasıyla imzala: `signtool sign /fd sha256 /tr http://timestamp.digicert.com /td sha256 /a dist\DNSPilot-Setup-1.0.0.exe`
+2. İmzalı dosyayı R2'ye `1.0.0/DNSPilot-Setup-1.0.0.exe` olarak yükle. Her sürüm yeni bir klasöre; yüklenen dosya sonradan değiştirilmez.
+3. Partner Center → Paketler: adres, mimari x64 ve x86, dil Türkçe, sessiz parametre `/S`; ardından paket doğrulamasını çalıştır ve gönder.

@@ -6,7 +6,11 @@ param(
     [Parameter(Mandatory = $true)][string]$Tools,
     [Parameter(Mandatory = $true)][string]$Engine,
     [string]$CertPfx,
-    [string]$CertPassword
+    [string]$CertPassword,
+    # Local test only: package under a test identity signed with a self-signed certificate.
+    [string]$TestName,
+    [string]$TestPublisher,
+    [string]$Out = 'dist\DNSPilot.msix'
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
@@ -30,6 +34,13 @@ if (Test-Path $layout) { Remove-Item $layout -Recurse -Force }
 New-Item -ItemType Directory -Force "$layout\Assets", "$layout\zapret\motor" | Out-Null
 Copy-Item dist\obj\DnsDegistirici.exe $layout
 Copy-Item msix\AppxManifest.xml $layout
+if ($TestName -and $TestPublisher) {
+    $mf = Join-Path $layout 'AppxManifest.xml'
+    $x = [IO.File]::ReadAllText($mf)
+    $x = [regex]::Replace($x, 'Name="Aegyip\.DNSPilot"', "Name=""$TestName""")
+    $x = [regex]::Replace($x, 'Publisher="CN=[^"]+"', "Publisher=""$TestPublisher""")
+    [IO.File]::WriteAllText($mf, $x, (New-Object Text.UTF8Encoding $false))
+}
 # Motor: yalnızca çalışması için gerekenler (cmd betikleri ve örnekler hariç)
 foreach ($f in 'winws2.exe', 'winws.exe', 'WinDivert.dll', 'WinDivert64.sys', 'cygwin1.dll', 'windivert.filter') {
     $p = Join-Path $Engine $f
@@ -57,7 +68,7 @@ Save-Scaled src\icon\logo-256.png 44 "$layout\Assets\Square44x44Logo.png"
 Save-Scaled src\icon\logo-256.png 50 "$layout\Assets\StoreLogo.png"
 
 # 3) Paketle
-$out = 'dist\DNSPilot.msix'
+$out = $Out
 & (Join-Path $Tools 'makeappx.exe') pack /d $layout /p $out /o
 if ($LASTEXITCODE -ne 0) { throw "makeappx başarısız" }
 

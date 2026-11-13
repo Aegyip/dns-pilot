@@ -37,6 +37,7 @@ namespace DnsDegistirici
                     catch (Exception) { }
                     return;
                 }
+                Notifications.RegisterIdentity(); // bildirim başlığında "DNS Pilot" adı ve logosu
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
                 Application.Run(new TrayContext());
@@ -331,7 +332,7 @@ namespace DnsDegistirici
                     StrategyTestStatus = result;
                     RefreshIcon();
                     NotifyChanged();
-                    tray.ShowBalloonTip(8000, "Strateji testi", Clip(result, 250), icon);
+                    Notify(8000, "Strateji testi", Clip(result, 250), icon);
                 }));
             });
         }
@@ -363,7 +364,7 @@ namespace DnsDegistirici
             var strategy = CurrentStrategy(Zapret.LoadStrategies());
             if (strategy == null)
             {
-                tray.ShowBalloonTip(5000, "Zapret", "stratejiler.txt içinde strateji yok.", ToolTipIcon.Warning);
+                Notify(5000, "Zapret", "stratejiler.txt içinde strateji yok.", ToolTipIcon.Warning);
                 return;
             }
             string filter = Settings.Get("zapret.filtre", Zapret.FilterList);
@@ -483,13 +484,19 @@ namespace DnsDegistirici
             });
         }
 
+        // Tüm bildirimler buradan geçer: uygulama logosuyla gösterilir; olmazsa standart balona düşer.
+        void Notify(int timeout, string title, string text, ToolTipIcon icon)
+        {
+            if (!Notifications.Show(tray, title, text, timeout))
+                tray.ShowBalloonTip(timeout, title, text, icon);
+        }
         // Bildirime tıklanınca ilgili Ayarlar sayfası açılır.
         string balloonPage;
 
         void Balloon(string title, string text, ToolTipIcon icon, string page)
         {
             balloonPage = page;
-            tray.ShowBalloonTip(6000, title, text, icon);
+            Notify(6000, title, text, icon);
         }
         static string ShortSha(string sha)
         {
@@ -516,15 +523,15 @@ namespace DnsDegistirici
                     busy = false;
                     RefreshIcon();
                     NotifyChanged();
-                    if (error == null) tray.ShowBalloonTip(3000, "DNS", successText(), ToolTipIcon.Info);
-                    else tray.ShowBalloonTip(8000, "DNS uyarısı", Clip(error, 250), ToolTipIcon.Warning);
+                    if (error == null) Notify(3000, "DNS", successText(), ToolTipIcon.Info);
+                    else Notify(8000, "DNS uyarısı", Clip(error, 250), ToolTipIcon.Warning);
                 }));
             });
         }
 
         void SpeedTest(List<DnsProfile> profiles)
         {
-            tray.ShowBalloonTip(2000, "Hız testi", "Ölçülüyor…", ToolTipIcon.None);
+            Notify(2000, "Hız testi", "Ölçülüyor…", ToolTipIcon.None);
             ThreadPool.QueueUserWorkItem(delegate
             {
                 var state = DnsManager.GetState(profiles);
@@ -546,7 +553,7 @@ namespace DnsDegistirici
         {
             string error = autostart == true ? Autostart.Disable() : Autostart.Enable();
             autostart = Autostart.IsEnabled();
-            if (error != null) tray.ShowBalloonTip(6000, "Başlangıç ayarı", Clip(error, 250), ToolTipIcon.Error);
+            if (error != null) Notify(6000, "Başlangıç ayarı", Clip(error, 250), ToolTipIcon.Error);
         }
 
         void RefreshIcon()

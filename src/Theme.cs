@@ -36,14 +36,15 @@ namespace DnsDegistirici
                 p.Separator = Color.FromArgb(64, 64, 64);
                 p.Border = Color.FromArgb(70, 70, 70);
                 p.Track = Color.FromArgb(58, 58, 58);
-                p.Card = Color.FromArgb(43, 43, 43);
-                p.CardBorder = Color.FromArgb(29, 29, 29);
-                p.CardHover = Color.FromArgb(50, 50, 50);
-                p.ControlBack = Color.FromArgb(45, 45, 45);
-                p.ControlHover = Color.FromArgb(50, 50, 50);
-                p.ControlBorder = Color.FromArgb(58, 58, 58);
-                p.NavSelected = Color.FromArgb(45, 45, 45);
-                p.NavHover = Color.FromArgb(41, 41, 41);
+                // Mica üzerinde yarı saydam katmanlar (WinUI 3 koyu tema değerleri).
+                p.Card = Color.FromArgb(13, 255, 255, 255);
+                p.CardBorder = Color.FromArgb(40, 0, 0, 0);
+                p.CardHover = Color.FromArgb(21, 255, 255, 255);
+                p.ControlBack = Color.FromArgb(15, 255, 255, 255);
+                p.ControlHover = Color.FromArgb(21, 255, 255, 255);
+                p.ControlBorder = Color.FromArgb(24, 255, 255, 255);
+                p.NavSelected = Color.FromArgb(15, 255, 255, 255);
+                p.NavHover = Color.FromArgb(10, 255, 255, 255);
                 p.Success = Color.FromArgb(108, 203, 95);
             }
             else
@@ -57,14 +58,15 @@ namespace DnsDegistirici
                 p.Separator = Color.FromArgb(229, 229, 229);
                 p.Border = Color.FromArgb(220, 220, 220);
                 p.Track = Color.FromArgb(228, 228, 228);
-                p.Card = Color.FromArgb(251, 251, 251);
-                p.CardBorder = Color.FromArgb(229, 229, 229);
-                p.CardHover = Color.FromArgb(246, 246, 246);
-                p.ControlBack = Color.FromArgb(254, 254, 254);
-                p.ControlHover = Color.FromArgb(249, 249, 249);
-                p.ControlBorder = Color.FromArgb(214, 214, 214);
-                p.NavSelected = Color.FromArgb(234, 234, 234);
-                p.NavHover = Color.FromArgb(237, 237, 237);
+                // Mica üzerinde yarı saydam katmanlar (WinUI 3 açık tema değerleri).
+                p.Card = Color.FromArgb(179, 255, 255, 255);
+                p.CardBorder = Color.FromArgb(15, 0, 0, 0);
+                p.CardHover = Color.FromArgb(128, 249, 249, 249);
+                p.ControlBack = Color.FromArgb(179, 255, 255, 255);
+                p.ControlHover = Color.FromArgb(128, 249, 249, 249);
+                p.ControlBorder = Color.FromArgb(30, 0, 0, 0);
+                p.NavSelected = Color.FromArgb(10, 0, 0, 0);
+                p.NavHover = Color.FromArgb(6, 0, 0, 0);
                 p.Success = Color.FromArgb(15, 123, 15);
             }
             return p;

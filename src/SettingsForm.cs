@@ -41,7 +41,7 @@ namespace DnsDegistirici
 
         readonly IAppActions app;
         readonly List<Page> pages = new List<Page>();
-        readonly Panel sidebar = new Panel();
+        readonly Panel sidebar = new BackdropPanel();
         readonly StackPanel content = new StackPanel();
         readonly FluentLabel appTitle;
         readonly PictureBox logoBox = new PictureBox(); // kenar çubuğunun başında uygulama logosu
@@ -75,10 +75,9 @@ namespace DnsDegistirici
             Controls.Add(content);
             Controls.Add(sidebar);
 
+            // Logo ve uygulama adı başlık çubuğunda (Windows Ayarlar düzeni); kenar çubuğunda yalnızca sayfalar.
             appTitle = new FluentLabel("DNS Pilot", Ui.Caption);
-            sidebar.Controls.Add(appTitle);
             logoBox.SizeMode = PictureBoxSizeMode.Zoom;
-            sidebar.Controls.Add(logoBox);
             foreach (var p in pages)
             {
                 var page = p;
@@ -93,6 +92,260 @@ namespace DnsDegistirici
 
             app.StateChanged += OnStateChanged;
             SystemEvents.UserPreferenceChanged += OnSystemTheme;
+        }
+
+        // ---- Windows 11 Ayarlar düzeninde, pencereyle bütünleşik başlık çubuğu ----
+        //
+        // Standart başlık çubuğu WM_NCCALCSIZE ile kaldırılır; tüm pencere istemci alanı olur ve Mica arka planı
+        // başlığın altına kesintisiz uzanır. Sürükleme, yeniden boyutlandırma ve düğmeler WM_NCHITTEST ile
+        // sisteme bildirilir; büyütme düğmesinde Windows 11'in Snap düzenleri menüsü çalışır.
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        static extern bool SetWindowPos(IntPtr hwnd, IntPtr after, int x, int y, int cx, int cy, int flags);
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        static extern int GetSystemMetrics(int index);
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        static extern bool TrackMouseEvent(ref TRACKMOUSEEVENT tme);
+
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+        struct TRACKMOUSEEVENT { public int cbSize; public int dwFlags; public IntPtr hwnd; public int dwHoverTime; }
+
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+        struct RECT { public int Left, Top, Right, Bottom; }
+
+        const int WM_NCCALCSIZE = 0x0083, WM_NCHITTEST = 0x0084, WM_NCMOUSEMOVE = 0x00A0, WM_NCLBUTTONDOWN = 0x00A1,
+                  WM_NCLBUTTONUP = 0x00A2, WM_NCLBUTTONDBLCLK = 0x00A3, WM_NCMOUSELEAVE = 0x02A2,
+                  WM_ENTERSIZEMOVE = 0x0231, WM_EXITSIZEMOVE = 0x0232;
+        const int HTCLIENT = 1, HTCAPTION = 2, HTMINBUTTON = 8, HTMAXBUTTON = 9, HTLEFT = 10, HTRIGHT = 11, HTTOP = 12,
+                  HTTOPLEFT = 13, HTTOPRIGHT = 14, HTBOTTOM = 15, HTBOTTOMLEFT = 16, HTBOTTOMRIGHT = 17, HTCLOSE = 20;
+
+        int hoverButton, pressedButton;
+        bool inSizeMove;
+
+        int TitleH { get { return Ui.D(48); } }
+        int ResizeBorder { get { return WindowState == FormWindowState.Maximized ? 0 : Ui.D(6); } }
+
+        Rectangle ButtonRect(int code)
+        {
+            int w = Ui.D(46), h = Ui.D(32);
+            int index = code == HTCLOSE ? 0 : code == HTMAXBUTTON ? 1 : 2; // sağdan sola
+            return new Rectangle(ClientSize.Width - w * (index + 1), 0, w, h);
+        }
+
+        // Kenar çubuğu ve sayfa başlığın altından başlar; kenarlarda yeniden boyutlandırma payı kalır.
+        // Pay da Mica ile boyandığı için görünmez.
+        void UpdateChromePadding()
+        {
+            int b = ResizeBorder;
+            var pad = new Padding(b, TitleH, b, b);
+            if (Padding != pad) Padding = pad;
+        }
+
+        protected override void WndProc(ref Message m)
+        {
+            switch (m.Msg)
+            {
+                case WM_NCCALCSIZE:
+                    if (m.WParam != IntPtr.Zero)
+                    {
+                        // Büyütülmüşken pencere ekran dışına taşan çerçeve kadar içeri alınır.
+                        if (WindowState == FormWindowState.Maximized)
+                        {
+                            var r = (RECT)System.Runtime.InteropServices.Marshal.PtrToStructure(m.LParam, typeof(RECT));
+                            int pad = GetSystemMetrics(92); // SM_CXPADDEDBORDER
+                            int fx = GetSystemMetrics(32) + pad, fy = GetSystemMetrics(33) + pad;
+                            r.Left += fx; r.Top += fy; r.Right -= fx; r.Bottom -= fy;
+                            System.Runtime.InteropServices.Marshal.StructureToPtr(r, m.LParam, false);
+                        }
+                        m.Result = IntPtr.Zero;
+                        return;
+                    }
+                    break;
+
+                case WM_NCHITTEST:
+                    {
+                        int x = (short)((long)m.LParam & 0xFFFF), y = (short)(((long)m.LParam >> 16) & 0xFFFF);
+                        m.Result = (IntPtr)HitTest(PointToClient(new Point(x, y)));
+                        return;
+                    }
+
+                case WM_NCMOUSEMOVE:
+                    {
+                        int code = (int)m.WParam;
+                        int hover = code == HTMINBUTTON || code == HTMAXBUTTON || code == HTCLOSE ? code : 0;
+                        if (hover != hoverButton) { hoverButton = hover; Invalidate(new Rectangle(0, 0, ClientSize.Width, TitleH)); }
+                        var tme = new TRACKMOUSEEVENT { cbSize = 16 + IntPtr.Size, dwFlags = 0x10 | 0x2, hwnd = Handle }; // TME_NONCLIENT | TME_LEAVE
+                        TrackMouseEvent(ref tme);
+                        if (hover != 0) { m.Result = IntPtr.Zero; return; }
+                        break;
+                    }
+
+                case WM_NCMOUSELEAVE:
+                    if (hoverButton != 0 || pressedButton != 0)
+                    {
+                        hoverButton = pressedButton = 0;
+                        Invalidate(new Rectangle(0, 0, ClientSize.Width, TitleH));
+                    }
+                    break;
+
+                case WM_NCLBUTTONDOWN:
+                case WM_NCLBUTTONDBLCLK:
+                    {
+                        int code = (int)m.WParam;
+                        if (code == HTMINBUTTON || code == HTMAXBUTTON || code == HTCLOSE)
+                        {
+                            pressedButton = code;
+                            Invalidate(new Rectangle(0, 0, ClientSize.Width, TitleH));
+                            m.Result = IntPtr.Zero;
+                            return;
+                        }
+                        break;
+                    }
+
+                case WM_NCLBUTTONUP:
+                    {
+                        int code = (int)m.WParam;
+                        if (pressedButton != 0)
+                        {
+                            int pressed = pressedButton;
+                            pressedButton = 0;
+                            Invalidate(new Rectangle(0, 0, ClientSize.Width, TitleH));
+                            if (code == pressed)
+                            {
+                                if (code == HTCLOSE) Close();
+                                else if (code == HTMINBUTTON) WindowState = FormWindowState.Minimized;
+                                else WindowState = WindowState == FormWindowState.Maximized ? FormWindowState.Normal : FormWindowState.Maximized;
+                            }
+                            m.Result = IntPtr.Zero;
+                            return;
+                        }
+                        break;
+                    }
+
+                case WM_ENTERSIZEMOVE:
+                    inSizeMove = true;
+                    break;
+
+                case WM_EXITSIZEMOVE:
+                    inSizeMove = false;
+                    RefreshBackdrop();
+                    break;
+            }
+            base.WndProc(ref m);
+        }
+
+        int HitTest(Point p)
+        {
+            int b = ResizeBorder;
+            if (b > 0)
+            {
+                bool left = p.X < b, right = p.X >= ClientSize.Width - b, top = p.Y < b, bottom = p.Y >= ClientSize.Height - b;
+                if (top && left) return HTTOPLEFT;
+                if (top && right) return HTTOPRIGHT;
+                if (bottom && left) return HTBOTTOMLEFT;
+                if (bottom && right) return HTBOTTOMRIGHT;
+                if (left) return HTLEFT;
+                if (right) return HTRIGHT;
+                if (bottom) return HTBOTTOM;
+                if (top) return HTTOP;
+            }
+            if (p.Y < TitleH)
+            {
+                if (ButtonRect(HTCLOSE).Contains(p)) return HTCLOSE;
+                if (ButtonRect(HTMAXBUTTON).Contains(p)) return HTMAXBUTTON;
+                if (ButtonRect(HTMINBUTTON).Contains(p)) return HTMINBUTTON;
+                return HTCAPTION;
+            }
+            return HTCLIENT;
+        }
+
+        protected override void OnPaintBackground(PaintEventArgs e)
+        {
+            Backdrop.Paint(e.Graphics, this, e.ClipRectangle);
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var g = e.Graphics;
+            var p = Ui.P;
+            bool active = Backdrop.Active;
+
+            // Logo + uygulama adı
+            int logo = Ui.D(16);
+            using (var bmp = Theme.Logo(logo))
+                g.DrawImage(bmp, Ui.D(16), (Ui.D(32) - logo) / 2 + Ui.D(8));
+            Ui.Text(g, "DNS Pilot", Ui.Caption, new Rectangle(Ui.D(44), Ui.D(8), Ui.D(300), Ui.D(32)),
+                    active ? p.Text : p.SubText, TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
+
+            // Başlık düğmeleri (Windows 11: 46×32, kapat üzerindeyken kırmızı)
+            foreach (int code in new[] { HTMINBUTTON, HTMAXBUTTON, HTCLOSE })
+            {
+                var r = ButtonRect(code);
+                bool hover = hoverButton == code, down = pressedButton == code;
+                Color fore = active ? p.Text : p.SubText;
+                if (code == HTCLOSE && (hover || down))
+                {
+                    using (var b = new SolidBrush(down ? Color.FromArgb(200, 196, 43, 28) : Color.FromArgb(196, 43, 28)))
+                        g.FillRectangle(b, r);
+                    fore = Color.White;
+                }
+                else if (hover || down)
+                {
+                    var c = p.Dark ? Color.FromArgb(down ? 11 : 15, 255, 255, 255) : Color.FromArgb(down ? 6 : 10, 0, 0, 0);
+                    using (var b = new SolidBrush(c)) g.FillRectangle(b, r);
+                }
+                string glyph = code == HTCLOSE ? "" : code == HTMINBUTTON ? ""
+                             : WindowState == FormWindowState.Maximized ? "" : "";
+                Ui.Glyph(g, glyph, 7.5f, r, fore);
+            }
+        }
+
+        // Mica, pencerenin ekrandaki konumuna ve etkinliğine bağlı: değişince her şey yeniden çizilir.
+        void RefreshBackdrop()
+        {
+            if (!IsHandleCreated) return;
+            content.InvalidateAllPieces();
+            Invalidate(true);
+        }
+
+        protected override void OnActivated(EventArgs e)
+        {
+            base.OnActivated(e);
+            Backdrop.Active = true;
+            RefreshBackdrop();
+        }
+
+        protected override void OnDeactivate(EventArgs e)
+        {
+            base.OnDeactivate(e);
+            Backdrop.Active = false;
+            RefreshBackdrop();
+        }
+
+        protected override void OnMove(EventArgs e)
+        {
+            base.OnMove(e);
+            if (!inSizeMove) RefreshBackdrop(); // Win+ok tuşlarıyla yerleştirme gibi anlık taşımalar
+        }
+
+        protected override void OnSizeChanged(EventArgs e)
+        {
+            base.OnSizeChanged(e);
+            if (IsHandleCreated) { UpdateChromePadding(); Invalidate(new Rectangle(0, 0, ClientSize.Width, TitleH)); }
+        }
+
+        // Kenar çubuğu: arka planı Mica.
+        class BackdropPanel : Panel
+        {
+            public BackdropPanel()
+            {
+                SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint, true);
+            }
+
+            protected override void OnPaintBackground(PaintEventArgs e)
+            {
+                Backdrop.Paint(e.Graphics, this, e.ClipRectangle);
+            }
         }
 
         protected override void OnFormClosed(FormClosedEventArgs e)
@@ -118,6 +371,9 @@ namespace DnsDegistirici
         {
             base.OnHandleCreated(e);
             Theme.ApplyWindow(Handle, Ui.P, false);
+            // Standart başlık çubuğunu kaldırmak için çerçeveyi yeniden hesaplat (WM_NCCALCSIZE).
+            SetWindowPos(Handle, IntPtr.Zero, 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0004 | 0x0010 | 0x0020);
+            UpdateChromePadding();
         }
 
         protected override void OnDpiChanged(DpiChangedEventArgs e)
@@ -131,6 +387,12 @@ namespace DnsDegistirici
 
         void OnSystemTheme(object sender, UserPreferenceChangedEventArgs e)
         {
+            if (e.Category == UserPreferenceCategory.Desktop)
+            {
+                // Duvar kâğıdı değişti: Mica yeniden hesaplanır.
+                BeginInvoke(new Action(() => { Backdrop.Reset(); RefreshBackdrop(); }));
+                return;
+            }
             if (e.Category != UserPreferenceCategory.General) return;
             BeginInvoke(new Action(() =>
             {
@@ -149,6 +411,7 @@ namespace DnsDegistirici
         void ApplyColors()
         {
             BackColor = sidebar.BackColor = content.BackColor = Ui.P.Surface;
+            if (IsHandleCreated) UpdateChromePadding();
             foreach (Control c in sidebar.Controls) c.Invalidate();
             appTitle.Color = Ui.P.Text;
             logoBox.BackColor = Ui.P.Surface;
@@ -184,7 +447,7 @@ namespace DnsDegistirici
             // Dar kenar çubuğunda yalnızca logo, ortalanmış; genişte logo + ad.
             logoBox.SetBounds(Compact ? (sidebar.Width - Ui.D(20)) / 2 : Ui.D(20), Ui.D(16), Ui.D(20), Ui.D(20));
             appTitle.SetBounds(Ui.D(50), Ui.D(18), Math.Max(1, w - Ui.D(30)), Ui.D(20));
-            int y = Ui.D(60);
+            int y = Ui.D(4);
             foreach (var p in pages)
             {
                 p.Nav.SetBounds(Ui.D(12), y, w, Ui.D(38));

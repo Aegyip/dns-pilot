@@ -113,6 +113,9 @@ static class Setup
         Run("schtasks.exe", "/delete /tn " + TaskName + " /f");
         Run("sc.exe", "stop windivert");
         try { File.Delete(ShortcutPath); } catch (Exception) { }
+        // Uygulamanın bildirim kimliği için oluşturduğu kullanıcı kısayolu ve kaydı (src\Notifications.cs).
+        try { File.Delete(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), AppName + ".lnk")); } catch (Exception) { }
+        try { Registry.CurrentUser.DeleteSubKeyTree(@"Software\Classes\AppUserModelId\DnsPilot.Desktop", false); } catch (Exception) { }
         try { Registry.LocalMachine.DeleteSubKeyTree(UninstallKey, false); } catch (Exception) { }
 
         // Çalışan uninstall.exe kendi klasörünü silemez: silmeyi kısa bir gecikmeyle cmd'ye bırak.

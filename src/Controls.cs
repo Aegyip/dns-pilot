@@ -58,6 +58,18 @@ namespace DnsDegistirici
             }
         }
 
+        // Denetim arka planı: Mica + (bir kartın içindeyse) kartın yarı saydam katmanı.
+        public static void PaintBack(Graphics g, Control c, Rectangle r)
+        {
+            Backdrop.Paint(g, c, r);
+            for (var a = c.Parent; a != null; a = a.Parent)
+            {
+                var card = a as SettingCard;
+                if (card == null) continue;
+                using (var b = new SolidBrush(card.Fill)) g.FillRectangle(b, r);
+                break;
+            }
+        }
         // Metin ölçümü her çağrıda ekran DC'si açtığı için pahalı; aynı metin/genişlik için sonuç saklanır.
         // (Her çizimde ve kaydırma görüntüsü hazırlanırken kartlar onlarca kez ölçülüyor.)
         static readonly Dictionary<string, int> measureCache = new Dictionary<string, int>();
@@ -122,8 +134,7 @@ namespace DnsDegistirici
 
         protected override void OnPaintBackground(PaintEventArgs e)
         {
-            var bg = Parent != null ? Parent.BackColor : Ui.P.Surface;
-            using (var b = new SolidBrush(bg)) e.Graphics.FillRectangle(b, ClientRectangle);
+            Ui.PaintBack(e.Graphics, this, ClientRectangle);
         }
     }
 
@@ -321,12 +332,7 @@ namespace DnsDegistirici
             Title = title;
             Description = description;
             Action = action;
-            BackColor = Ui.P.Card;
-            if (action != null)
-            {
-                action.BackColor = Ui.P.Card;
-                Controls.Add(action);
-            }
+            if (action != null) Controls.Add(action);
         }
 
         public SettingCard OnClick(EventHandler handler)
@@ -341,6 +347,9 @@ namespace DnsDegistirici
         {
             if (Clickable && Clicked != null) Clicked(this, EventArgs.Empty);
         }
+
+        // Mica üzerindeki yarı saydam kart katmanı (içindeki düğmeler de bunun üstüne çizilir).
+        public Color Fill { get { return Clickable && Enabled && Hover ? Ui.P.CardHover : Ui.P.Card; } }
 
         int LeftText { get { return Large ? Ui.D(96) : Glyph != null ? Ui.D(60) : Ui.D(18); } }
 
@@ -394,9 +403,7 @@ namespace DnsDegistirici
         {
             var p = Ui.P;
             var g = e.Graphics;
-            var bg = Clickable && Enabled && Hover ? p.CardHover : p.Card;
-            BackColor = bg;
-            if (Action != null && Action.BackColor != bg) { Action.BackColor = bg; Action.Invalidate(); }
+            var bg = Fill;
 
             // Gruplu kartlarda yalnızca dış köşeler yuvarlak.
             var r = new RectangleF(0.5f, 0.5f, Width - 1, Height - 1);
@@ -471,7 +478,15 @@ namespace DnsDegistirici
                 using (var b = new SolidBrush(p.Accent))
                     g.FillPath(b, path);
             }
-            Ui.Glyph(g, Glyph, 12f, new Rectangle(Ui.D(14), 0, Ui.D(20), Height), p.Text);
+            Icons.Painter icon;
+            if (Icons.Nav.TryGetValue(Text, out icon))
+            {
+                // Ayarlar uygulamasındaki gibi renkli simge (20 px).
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                icon(g, new RectangleF(Ui.D(14), (Height - Ui.D(20)) / 2f, Ui.D(20), Ui.D(20)));
+            }
+            else
+                Ui.Glyph(g, Glyph, 12f, new Rectangle(Ui.D(14), 0, Ui.D(20), Height), p.Text);
             if (Width > Ui.D(80)) // dar pencerede yalnızca simge
                 Ui.Text(g, Text, Ui.Body, new Rectangle(Ui.D(48), 0, Width - Ui.D(52), Height), p.Text,
                     TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis);
@@ -500,8 +515,7 @@ namespace DnsDegistirici
 
         protected override void OnPaint(PaintEventArgs e)
         {
-            using (var b = new SolidBrush(Parent != null ? Parent.BackColor : Ui.P.Surface))
-                e.Graphics.FillRectangle(b, ClientRectangle);
+            Ui.PaintBack(e.Graphics, this, ClientRectangle);
             Ui.Text(e.Graphics, Text, Font, ClientRectangle, Color ?? Ui.P.Text, Wrap ? TextFormatFlags.WordBreak : TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis);
         }
     }
@@ -553,6 +567,11 @@ namespace DnsDegistirici
             public HostPanel()
             {
                 SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint, true);
+            }
+
+            protected override void OnPaintBackground(PaintEventArgs e)
+            {
+                Backdrop.Paint(e.Graphics, this, e.ClipRectangle);
             }
         }
 
@@ -631,7 +650,8 @@ namespace DnsDegistirici
             dirty.Clear();
         }
 
-        void InvalidateAllPieces()
+        // Mica arka planı değişince (pencere taşındı, etkinlik değişti, tema) tüm kart görüntüleri yenilenir.
+        public void InvalidateAllPieces()
         {
             foreach (Control c in host.Controls) dirty.Add(c);
             QueuePrewarm();
@@ -803,6 +823,8 @@ namespace DnsDegistirici
                 Arrange();
                 host.ResumeLayout(false);
                 host.Visible = true;
+                // Kartlar yeni konumda; görüntülerindeki Mica parçası artık eski konuma ait.
+                InvalidateAllPieces();
                 Invalidate(Track);
             }
         }
@@ -886,7 +908,7 @@ namespace DnsDegistirici
 
         protected override void OnPaintBackground(PaintEventArgs e)
         {
-            using (var b = new SolidBrush(BackColor)) e.Graphics.FillRectangle(b, e.ClipRectangle);
+            Backdrop.Paint(e.Graphics, this, e.ClipRectangle);
         }
 
         protected override void OnPaint(PaintEventArgs e)

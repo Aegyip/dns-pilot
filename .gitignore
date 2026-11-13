@@ -1,0 +1,5 @@
+# Derleme çıktısı, kişisel ayarlar ve indirilen zapret motoru
+bin/
+*.exe
+*.pdb
+*.zip

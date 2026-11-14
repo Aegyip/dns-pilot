@@ -137,9 +137,9 @@ docs/img/       README görselleri
 Klasik kurulumda bu dosyalar exe'nin yanında, Microsoft Store sürümünde uygulamanın kendi veri klasöründe (`%LOCALAPPDATA%\Packages\Aegyip.DNSPilot_…\LocalCache\Local\DNS Pilot`) durur.
 </details>
 
-## 🔐 Gizlilik
-
-DNS Pilot hiçbir kişisel veri toplamaz ve geliştiriciye veri göndermez. Seçtiğiniz DNS sağlayıcısı, alan adı sorgularınızı ve IP adresinizi görür; onun gizlilik politikası geçerlidir. Hız ve strateji testlerinin sonuçları cihazınızdan çıkmaz.
+<p align="center">
+  <img src="docs/img/gizlilik.png" alt="Gizlilik: Kişisel veri toplanmaz; test sonuçları cihazınızdan çıkmaz." width="100%">
+</p>
 
 ## 🙏 Teşekkürler
 

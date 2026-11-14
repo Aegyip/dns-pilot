@@ -40,13 +40,11 @@ body:
     id: windows
     attributes:
       label: Windows sürümü
-  - type: dropdown
+  - type: input
     id: kurulum
     attributes:
       label: Kurulum türü
-      options:
-        - Microsoft Store
-        - Klasik kurulum / kaynaktan derleme
+      placeholder: Microsoft Store / klasik kurulum
   - type: input
     id: zapret
     attributes:

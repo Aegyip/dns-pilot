@@ -45,7 +45,7 @@ namespace DnsPilot
         {
             ThreadPool.QueueUserWorkItem(delegate { Autostart.RepairIfStale(); });
 
-            if (Settings.Get("zapret.otomatik", "0") == "1" && !Zapret.IsRunning())
+            if (Settings.Get("zapret.otomatik", "1") == "1" && Zapret.Installed && !Zapret.IsRunning())
             {
                 ThreadPool.QueueUserWorkItem(delegate
                 {

@@ -113,7 +113,7 @@ namespace DnsDegistirici
 
             ScheduleAutoUpdateCheck();
 
-            if (Settings.Get("zapret.otomatik", "0") == "1" && !Zapret.IsRunning())
+            if (Settings.Get("zapret.otomatik", "1") == "1" && Zapret.Installed && !Zapret.IsRunning())
             {
                 // Açılışta ağ birkaç saniye geç gelebilir; şifreli DNS testi boşa düşmesin diye bekle.
                 ThreadPool.QueueUserWorkItem(delegate

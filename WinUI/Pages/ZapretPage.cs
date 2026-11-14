@@ -100,7 +100,7 @@ namespace DnsPilot.Pages
             Section(s, "Başlangıç ve DNS");
             s.Children.Add(Card("", "Uygulama açıldığında başlat",
                 "Zapret, uygulama her başlatıldığında otomatik olarak etkinleşir.",
-                Toggle(Settings.Get("zapret.otomatik", "0") == "1", v => Settings.Set("zapret.otomatik", v ? "1" : "0"))));
+                Toggle(Settings.Get("zapret.otomatik", "1") == "1", v => Settings.Set("zapret.otomatik", v ? "1" : "0"))));
 
             bool autoDns = Settings.Get("zapret.sifreli_dns", "1") == "1";
             s.Children.Add(Card("", "Şifreli DNS'e otomatik geç",

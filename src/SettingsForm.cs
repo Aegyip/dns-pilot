@@ -676,7 +676,7 @@ namespace DnsDegistirici
                     "Önerilen ayar, yalnızca listedeki sitelerdir. Otomatik algılama, erişilemeyen siteleri kendiliğinden listeye ekler.", filter));
 
             Section(s, "Başlangıç ve DNS");
-            var autoStart = new FluentToggle(Settings.Get("zapret.otomatik", "0") == "1");
+            var autoStart = new FluentToggle(Settings.Get("zapret.otomatik", "1") == "1");
             autoStart.Toggled += (o, e) => Settings.Set("zapret.otomatik", autoStart.Checked ? "1" : "0");
             var autoDns = new FluentToggle(Settings.Get("zapret.sifreli_dns", "1") == "1");
             autoDns.Toggled += (o, e) => { Settings.Set("zapret.sifreli_dns", autoDns.Checked ? "1" : "0"); Rebuild(); };

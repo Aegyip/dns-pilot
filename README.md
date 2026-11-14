@@ -148,6 +148,6 @@ DNS Pilot hiçbir kişisel veri toplamaz ve geliştiriciye veri göndermez. Seç
 
 ## ⚠️ Sorumluluk
 
-DNS Pilot, kullanıcının kendi bilgisayarındaki ağ ayarlarını değiştirir. Uygulamayı yürürlükteki yasalara ve internet servis sağlayıcınızın koşullarına uygun şekilde kullanmak kullanıcının sorumluluğundadır.
-
-<p align="center"><sub>© 2026 Aegyip · DNS Pilot</sub></p>
+<p align="center">
+  <img src="docs/img/sorumluluk.png" alt="DNS Pilot, kullanıcının kendi bilgisayarındaki ağ ayarlarını değiştirir. Uygulamayı yürürlükteki yasalara ve internet servis sağlayıcınızın koşullarına uygun şekilde kullanmak kullanıcının sorumluluğundadır. © 2026 Aegyip · DNS Pilot" width="100%">
+</p>

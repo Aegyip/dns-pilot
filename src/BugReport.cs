@@ -4,19 +4,18 @@ using Microsoft.Win32;
 
 namespace DnsDegistirici
 {
-    // Opens a pre-filled GitHub issue form (.github/ISSUE_TEMPLATE/bug_report.yml).
+    // Opens a pre-filled GitHub issue form (.github/ISSUE_TEMPLATE/hata-bildirimi.yml).
     // Only technical details are sent in the URL; the user reviews everything before submitting.
-    // Issues are in English: the app is used worldwide.
     static class BugReport
     {
         public const string RepoUrl = "https://github.com/Aegyip/dns-pilot";
 
         public static void Open()
         {
-            string url = RepoUrl + "/issues/new?template=bug_report.yml" +
-                "&version=" + Uri.EscapeDataString(AppVersion()) +
+            string url = RepoUrl + "/issues/new?template=hata-bildirimi.yml" +
+                "&surum=" + Uri.EscapeDataString(AppVersion()) +
                 "&windows=" + Uri.EscapeDataString(WindowsVersion()) +
-                "&install=" + Uri.EscapeDataString(Settings.Packaged ? "Microsoft Store" : "Installer / built from source") +
+                "&kurulum=" + Uri.EscapeDataString(Settings.Packaged ? "Microsoft Store" : "Klasik kurulum / kaynaktan derleme") +
                 "&zapret=" + Uri.EscapeDataString(ZapretInfo());
             if (!Launch(url)) Launch(RepoUrl + "/issues/new/choose");
         }
@@ -60,7 +59,7 @@ namespace DnsDegistirici
                     int b; int.TryParse(build, out b);
                     string name = b >= 22000 ? "Windows 11" : "Windows 10";
                     object ubr = k.GetValue("UBR");
-                    return name + (display.Length > 0 ? " " + display : "") + " (build " + build + (ubr != null ? "." + ubr : "") + ")";
+                    return name + (display.Length > 0 ? " " + display : "") + " (derleme " + build + (ubr != null ? "." + ubr : "") + ")";
                 }
             }
             catch (Exception) { return Environment.OSVersion.VersionString; }
@@ -72,7 +71,7 @@ namespace DnsDegistirici
             {
                 string sha = Zapret.CurrentVersion() ?? "";
                 if (sha.Length > 7) sha = sha.Substring(0, 7);
-                return (Zapret.IsRunning() ? "Running" : "Stopped") + (sha.Length > 0 ? " · engine " + sha : "");
+                return (Zapret.IsRunning() ? "Çalışıyor" : "Kapalı") + (sha.Length > 0 ? " · motor " + sha : "");
             }
             catch (Exception) { return ""; }
         }

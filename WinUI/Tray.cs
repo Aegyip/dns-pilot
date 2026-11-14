@@ -1,0 +1,184 @@
+using System.Collections.Generic;
+using System;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Windows.Input;
+using DnsDegistirici;
+using H.NotifyIcon;
+using H.NotifyIcon.Core;
+using Microsoft.UI.Xaml.Controls;
+
+namespace DnsPilot
+{
+    // Tepsi simgesi (durum noktalı logo), WinUI menüsü ve bildirimler.
+    public sealed class Tray : IDisposable
+    {
+        [DllImport("user32.dll")]
+        static extern bool DestroyIcon(IntPtr handle);
+        [DllImport("user32.dll")]
+        static extern int GetSystemMetrics(int index);
+
+        readonly AppController app;
+        readonly TaskbarIcon icon;
+        readonly TrayMenuHost menuHost = new TrayMenuHost();
+        Icon current;
+        IntPtr currentHandle;
+        Icon balloonLogo;
+
+        public Tray(AppController app)
+        {
+            this.app = app;
+            icon = new TaskbarIcon
+            {
+                ToolTipText = "DNS Pilot",
+                NoLeftClickDelay = true,
+                LeftClickCommand = new Command(() => App.Instance.ShowWindow(null)),
+            };
+            // Sağ tık: Windows 11 tepsi menüleri gibi WinUI menüsü (TrayMenuHost). Kütüphanenin kendi
+            // "ikinci pencere" kipi menüyü göstermiyor, yerel Win32 menüsü de eski görünüyordu.
+            icon.RightClickCommand = new Command(() => App.UI.TryEnqueue(() => menuHost.Show(BuildMenu())));
+            app.StateChanged += RefreshIcon;
+            RefreshIcon();
+            icon.ForceCreate(false); // verimlilik kipi kapalı: zapret/DNS işleri yavaşlatılmasın
+        }
+
+        // ---- Menü: yalnızca sık kullanılanlar, geri kalanı Ayarlar penceresinde ----
+
+        List<TrayMenuHost.Entry> BuildMenu()
+        {
+            var items = new List<TrayMenuHost.Entry>();
+            var profiles = ProfileStore.Load();
+            var state = DnsManager.GetState(profiles);
+            bool zapretOn = Zapret.IsRunning();
+            var strategy = AppController.CurrentStrategy(Zapret.LoadStrategies());
+
+            items.Add(new TrayMenuHost.Item { Text = state.Summary, Glyph = "\uE774", Enabled = false });
+            items.Add(new TrayMenuHost.Item
+            {
+                Text = zapretOn ? "Zapret: etkin · " + (strategy != null ? strategy.Name : "?") : "Zapret: devre dışı",
+                Glyph = "\uEA18",
+                Enabled = false
+            });
+            items.Add(new TrayMenuHost.Separator());
+
+            items.Add(new TrayMenuHost.Item
+            {
+                Text = zapretOn ? "Zapret'i durdur" : "Zapret'i başlat",
+                Glyph = zapretOn ? "\uE71A" : "\uE768",
+                Enabled = !app.Busy && Zapret.Installed,
+                Action = () => { if (zapretOn) app.StopZapret(); else app.StartZapret(); }
+            });
+            items.Add(new TrayMenuHost.Separator());
+
+            foreach (var p in profiles)
+            {
+                var profile = p;
+                items.Add(new TrayMenuHost.Item
+                {
+                    Text = p.Name,
+                    Checked = state.IsStatic && state.Matched == p.Name,
+                    Enabled = !app.Busy,
+                    Action = () => app.ApplyProfile(profile)
+                });
+            }
+            items.Add(new TrayMenuHost.Item
+            {
+                Text = "Otomatik",
+                Checked = state.HasAdapter && !state.IsStatic,
+                Enabled = !app.Busy,
+                Action = app.ResetDns
+            });
+
+            items.Add(new TrayMenuHost.Separator());
+            items.Add(new TrayMenuHost.Item { Text = "DNS hız testi", Glyph = "\uEC4A", Action = () => App.Instance.ShowWindow("Giriş") });
+            items.Add(new TrayMenuHost.Item { Text = "DNS Pilot ayarları", Glyph = "\uE713", Action = () => App.Instance.ShowWindow(null) });
+            items.Add(new TrayMenuHost.Item { Text = "Hata bildir", Glyph = "\uEBE8", Action = BugReport.Open });
+            items.Add(new TrayMenuHost.Item { Text = "Çıkış", Glyph = "\uE7E8", Action = App.Instance.ExitApp });
+            return items;
+        }
+        // ---- Simge: logo + sağ altta durum noktası ----
+
+        void RefreshIcon()
+        {
+            var state = DnsManager.GetState(ProfileStore.Load());
+            bool zapretOn = Zapret.IsRunning();
+            Color color = !state.HasAdapter ? Color.FromArgb(220, 38, 38)   // kırmızı: bağlantı yok
+                        : !state.IsStatic   ? Color.FromArgb(115, 115, 115) // gri: servis sağlayıcı DNS'i
+                        : state.DohOn       ? Color.FromArgb(22, 163, 74)   // yeşil: şifreli
+                        :                     Color.FromArgb(139, 92, 246); // mor: şifresiz özel
+            Color dot = zapretOn && state.HasAdapter ? Color.FromArgb(245, 158, 11) : color;
+
+            int size = Math.Max(16, GetSystemMetrics(49)); // SM_CXSMICON: tepsinin gerçek boyutu
+            using (var bmp = Logo(size))
+            using (var g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                float d = size * 0.40f, gap = Math.Max(1.5f, size / 12f);
+                float cx = size - d / 2, cy = size - d / 2;
+                g.CompositingMode = CompositingMode.SourceCopy;
+                using (var clear = new SolidBrush(Color.Transparent))
+                    g.FillEllipse(clear, cx - d / 2 - gap, cy - d / 2 - gap, d + 2 * gap, d + 2 * gap);
+                g.CompositingMode = CompositingMode.SourceOver;
+                using (var b = new SolidBrush(dot)) g.FillEllipse(b, cx - d / 2, cy - d / 2, d, d);
+
+                IntPtr handle = bmp.GetHicon();
+                var next = Icon.FromHandle(handle);
+                icon.Icon = next;
+                if (currentHandle != IntPtr.Zero) DestroyIcon(currentHandle);
+                current = next;
+                currentHandle = handle;
+            }
+            icon.ToolTipText = AppController.Clip(state.Summary + (zapretOn ? " · Zapret" : ""), 63);
+        }
+
+        static string IcoPath { get { return Path.Combine(AppContext.BaseDirectory, "Assets", "app.ico"); } }
+
+        static Bitmap Logo(int size)
+        {
+            var bmp = new Bitmap(size, size);
+            try
+            {
+                using (var ico = new Icon(IcoPath, size, size))
+                using (var src = ico.ToBitmap())
+                using (var g = Graphics.FromImage(bmp))
+                {
+                    g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                    g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                    g.DrawImage(src, new Rectangle(0, 0, size, size));
+                }
+            }
+            catch (Exception) { }
+            return bmp;
+        }
+
+        // ---- Bildirim: gövdede büyük uygulama logosu ----
+
+        public void Notify(string title, string message, bool warning)
+        {
+            try
+            {
+                if (balloonLogo == null) balloonLogo = new Icon(IcoPath, 48, 48);
+                icon.ShowNotification(title, message, NotificationIcon.None, balloonLogo.Handle, largeIcon: true);
+            }
+            catch (Exception) { }
+        }
+
+        public void Dispose()
+        {
+            icon.Dispose();
+            if (currentHandle != IntPtr.Zero) DestroyIcon(currentHandle);
+            if (balloonLogo != null) balloonLogo.Dispose();
+        }
+
+        sealed class Command : ICommand
+        {
+            readonly Action action;
+            public Command(Action action) { this.action = action; }
+            public event EventHandler CanExecuteChanged { add { } remove { } }
+            public bool CanExecute(object parameter) { return true; }
+            public void Execute(object parameter) { action(); }
+        }
+    }
+}

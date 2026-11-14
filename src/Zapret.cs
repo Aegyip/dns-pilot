@@ -29,7 +29,20 @@ namespace DnsDegistirici
         public static readonly bool Packaged = DetectPackaged();
 
         // Exe'nin bulunduğu klasör. Pakette salt okunurdur.
-        public static readonly string InstallDir = Path.GetDirectoryName(typeof(Settings).Assembly.Location);
+        public static readonly string InstallDir = ResolveInstallDir();
+
+        // WinUI sürümü geliştirme sırasında bin\winui\ alt klasöründen çalışır; zapret motoru ve kullanıcı
+        // dosyaları bir üstteki bin\ klasöründe durur. Exe'nin yanında yoksa üst klasöre bakılır.
+        static string ResolveInstallDir()
+        {
+            string dir = Path.GetDirectoryName(typeof(Settings).Assembly.Location);
+            if (Directory.Exists(Path.Combine(dir, "zapret")) || File.Exists(Path.Combine(dir, "profiles.txt"))) return dir;
+            var parent = Directory.GetParent(dir);
+            if (parent != null && (Directory.Exists(Path.Combine(parent.FullName, "zapret")) ||
+                                   File.Exists(Path.Combine(parent.FullName, "profiles.txt"))))
+                return parent.FullName;
+            return dir;
+        }
 
         // Kullanıcı dosyalarının (ayarlar, profiller, listeler) klasörü.
         // Klasik kurulumda exe'nin yanı; pakette %LOCALAPPDATA%\DNS Pilot.

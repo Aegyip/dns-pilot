@@ -9,7 +9,7 @@
   xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
   IgnorableNamespaces="uap uap3 desktop rescap">
 
-  <Identity Name="Aegyip.DNSPilot" Publisher="CN=05566F3D-DB44-4AE1-8BAA-3D73B26508DA" Version="1.0.0.0" ProcessorArchitecture="x64" />
+  <Identity Name="Aegyip.DNSPilot" Publisher="CN=05566F3D-DB44-4AE1-8BAA-3D73B26508DA" Version="2.0.0.0" ProcessorArchitecture="x64" />
 
   <Properties>
     <DisplayName>DNS Pilot</DisplayName>
@@ -26,12 +26,12 @@
   </Resources>
 
   <Applications>
-    <Application Id="DNSPilot" Executable="DnsDegistirici.exe" EntryPoint="Windows.FullTrustApplication">
+    <Application Id="DNSPilot" Executable="DnsPilot.exe" EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements DisplayName="DNS Pilot" Description="Şifreli DNS ve erişim aracı"
         BackgroundColor="transparent" Square150x150Logo="Assets\Square150x150Logo.png" Square44x44Logo="Assets\Square44x44Logo.png" />
       <Extensions>
         <!-- Sabit komut adı: "Windows ile başlat" görevi, sürümden bağımsız bu yolu çalıştırır. -->
-        <uap3:Extension Category="windows.appExecutionAlias" Executable="DnsDegistirici.exe" EntryPoint="Windows.FullTrustApplication">
+        <uap3:Extension Category="windows.appExecutionAlias" Executable="DnsPilot.exe" EntryPoint="Windows.FullTrustApplication">
           <uap3:AppExecutionAlias>
             <desktop:ExecutionAlias Alias="dnspilot.exe" />
           </uap3:AppExecutionAlias>

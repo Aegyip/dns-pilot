@@ -815,7 +815,7 @@ namespace DnsDegistirici
             report.GlyphColor = Ui.P.Accent;
             Group(s, Ui.D(8), report,
                 new SettingCard("", "Kaynak kodu", "DNS Pilot açık kaynaktır: github.com/Aegyip/dns-pilot")
-                    .OnClick((o, e) => { try { Process.Start(BugReport.RepoUrl); } catch (Exception) { } }));
+                    .OnClick((o, e) => BugReport.OpenRepo()));
         }
     }
 }

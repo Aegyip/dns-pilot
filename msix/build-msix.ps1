@@ -17,22 +17,14 @@ $root = Split-Path $PSScriptRoot -Parent
 Set-Location $root
 Add-Type -AssemblyName System.Drawing
 
-# 1) Uygulama
-$csc = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
-New-Item -ItemType Directory -Force dist\obj | Out-Null
-& $csc /nologo /target:winexe /platform:anycpu /optimize+ /codepage:65001 `
-    /out:dist\obj\DnsDegistirici.exe /win32manifest:src\app.manifest `
-    /win32icon:src\app.ico /resource:src\app.ico,DnsPilot.app.ico `
-    /r:System.dll /r:System.Core.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll `
-    /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll `
-    src\*.cs
-if ($LASTEXITCODE -ne 0) { throw "Uygulama derlenemedi" }
+# 1) Uygulama (WinUI 3, self-contained): dist\winui-publish\
+if (-not (Test-Path dist\winui-publish\DnsPilot.exe)) { & (Join-Path $root 'WinUI\publish.ps1') }
 
 # 2) Paket düzeni
 $layout = 'dist\msix-layout'
 if (Test-Path $layout) { Remove-Item $layout -Recurse -Force }
 New-Item -ItemType Directory -Force "$layout\Assets", "$layout\zapret\motor" | Out-Null
-Copy-Item dist\obj\DnsDegistirici.exe $layout
+Copy-Item dist\winui-publish\* $layout -Recurse -Force  # Assets klasörü pakette zaten var: birleştir
 Copy-Item msix\AppxManifest.xml $layout
 if ($TestName -and $TestPublisher) {
     $mf = Join-Path $layout 'AppxManifest.xml'
@@ -66,6 +58,8 @@ function Save-Scaled($src, $size, $dst) {
 Save-Scaled src\icon\logo-256.png 150 "$layout\Assets\Square150x150Logo.png"
 Save-Scaled src\icon\logo-256.png 44 "$layout\Assets\Square44x44Logo.png"
 Save-Scaled src\icon\logo-256.png 50 "$layout\Assets\StoreLogo.png"
+# Görev çubuğu/Başlat için plakasız (unplated) ve ölçekli logolar WinUI\Assets içinde; WinUI derlemesi onları
+# resources.pri'ye ekler. Windows bunları bulamazsa logoyu vurgu renginde bir kare plaka içinde gösterir.
 
 # 3) Paketle
 $out = $Out

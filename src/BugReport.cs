@@ -17,8 +17,30 @@ namespace DnsDegistirici
                 "&windows=" + Uri.EscapeDataString(WindowsVersion()) +
                 "&kurulum=" + Uri.EscapeDataString(Settings.Packaged ? "Microsoft Store" : "Klasik kurulum / kaynaktan derleme") +
                 "&zapret=" + Uri.EscapeDataString(ZapretInfo());
-            try { Process.Start(url); }
-            catch (Exception) { try { Process.Start(RepoUrl + "/issues/new/choose"); } catch (Exception) { } }
+            if (!Launch(url)) Launch(RepoUrl + "/issues/new/choose");
+        }
+
+        public static void OpenRepo()
+        {
+            Launch(RepoUrl);
+        }
+
+        // The app runs elevated; opening the URL through explorer.exe starts the browser in the user's normal
+        // (non-admin) context. Process.Start(url) also throws on .NET 8 unless UseShellExecute is set.
+        static bool Launch(string url)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo("explorer.exe", "\"" + url + "\"") { UseShellExecute = false });
+                return true;
+            }
+            catch (Exception) { }
+            try
+            {
+                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+                return true;
+            }
+            catch (Exception) { return false; }
         }
 
         static string AppVersion()

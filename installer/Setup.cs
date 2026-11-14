@@ -1,16 +1,17 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
 using System.Reflection;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
 [assembly: AssemblyTitle("DNS Pilot Kurulum")]
 [assembly: AssemblyProduct("DNS Pilot")]
-[assembly: AssemblyVersion("1.0.0.0")]
-[assembly: AssemblyFileVersion("1.0.0.0")]
+[assembly: AssemblyVersion("2.0.0.0")]
+[assembly: AssemblyFileVersion("2.0.0.0")]
 
-// DNS Pilot kurucusu. Uygulama exe'si bu dosyaya gömülüdür.
+// DNS Pilot kurucusu. Uygulama (WinUI 3, .NET ve Windows App SDK dahil) bu dosyaya zip olarak gömülüdür.
 //   setup.exe                 → kurar (onay sorar, sonunda uygulamayı açar)
 //   setup.exe /S              → sessiz kurulum (Microsoft Store bunu kullanır)
 //   setup.exe /uninstall [/S] → kaldırır
@@ -18,9 +19,10 @@ using Microsoft.Win32;
 static class Setup
 {
     const string AppName = "DNS Pilot";
-    const string Version = "1.0.0";
+    const string Version = "2.0.0";
     const string Publisher = "Ozan İnce";
-    const string ExeName = "DnsDegistirici.exe";
+    const string ExeName = "DnsPilot.exe";
+    const string OldExeName = "DnsDegistirici.exe"; // 1.x (WinForms) sürümü
     const string UninstallKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\DNSPilot";
     const string TaskName = "DnsDegistirici";
 
@@ -66,11 +68,9 @@ static class Setup
         StopApp();
         Directory.CreateDirectory(InstallDir);
         string exe = Path.Combine(InstallDir, ExeName);
-        using (var res = Assembly.GetExecutingAssembly().GetManifestResourceStream("app.exe"))
-        {
-            if (res == null) throw new Exception("Kurulum paketi bozuk: uygulama dosyası bulunamadı.");
-            using (var f = File.Create(exe)) res.CopyTo(f);
-        }
+        Extract(InstallDir);
+        // 1.x sürümünden yükseltme: eski tek dosyalık exe kaldırılır (ayarlar, profiller ve zapret dosyaları korunur).
+        try { File.Delete(Path.Combine(InstallDir, OldExeName)); } catch (Exception) { }
 
         // Kaldırma için kurucunun kendisini kurulum klasörüne kopyala.
         string uninstaller = Path.Combine(InstallDir, "uninstall.exe");
@@ -89,7 +89,7 @@ static class Setup
             k.SetValue("QuietUninstallString", "\"" + uninstaller + "\" /uninstall /S");
             k.SetValue("NoModify", 1, RegistryValueKind.DWord);
             k.SetValue("NoRepair", 1, RegistryValueKind.DWord);
-            k.SetValue("EstimatedSize", (int)(new FileInfo(exe).Length / 1024 + new FileInfo(uninstaller).Length / 1024), RegistryValueKind.DWord);
+            k.SetValue("EstimatedSize", (int)(DirSize(InstallDir) / 1024), RegistryValueKind.DWord);
             k.SetValue("InstallDate", DateTime.Now.ToString("yyyyMMdd"));
         }
 
@@ -131,9 +131,41 @@ static class Setup
         return 0;
     }
 
+    // Gömülü app.zip'i kurulum klasörüne açar. Var olan uygulama dosyalarının üzerine yazılır;
+    // kullanıcı dosyaları (ayarlar.txt, profiles.txt, zapret\) zip'te olmadığı için dokunulmaz.
+    static void Extract(string dir)
+    {
+        using (var res = Assembly.GetExecutingAssembly().GetManifestResourceStream("app.zip"))
+        {
+            if (res == null) throw new Exception("Kurulum paketi bozuk: uygulama dosyaları bulunamadı.");
+            using (var zip = new ZipArchive(res, ZipArchiveMode.Read))
+            {
+                string root = Path.GetFullPath(dir) + Path.DirectorySeparatorChar;
+                foreach (var entry in zip.Entries)
+                {
+                    string target = Path.GetFullPath(Path.Combine(dir, entry.FullName));
+                    if (!target.StartsWith(root, StringComparison.OrdinalIgnoreCase)) continue; // zip dışına yazma
+                    if (string.IsNullOrEmpty(entry.Name)) { Directory.CreateDirectory(target); continue; }
+                    Directory.CreateDirectory(Path.GetDirectoryName(target));
+                    using (var src = entry.Open())
+                    using (var dst = File.Create(target))
+                        src.CopyTo(dst);
+                }
+            }
+        }
+    }
+
+    static long DirSize(string dir)
+    {
+        long total = 0;
+        foreach (var f in Directory.GetFiles(dir, "*", SearchOption.AllDirectories))
+            try { total += new FileInfo(f).Length; } catch (Exception) { }
+        return total;
+    }
+
     static void StopApp()
     {
-        foreach (var name in new[] { "DnsDegistirici", "winws", "winws2" })
+        foreach (var name in new[] { "DnsPilot", "DnsDegistirici", "winws", "winws2" })
             foreach (var p in Process.GetProcessesByName(name))
             {
                 try { p.Kill(); p.WaitForExit(5000); } catch (Exception) { }

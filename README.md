@@ -60,13 +60,13 @@
 <details>
 <summary><b>Kaynaktan derleme</b></summary>
 
-Ek bir kurulum gerekmez; Windows'un yerleşik .NET Framework 4.8 derleyicisi kullanılır.
+Uygulama WinUI 3 (Windows App SDK) ile yazılmıştır. Derlemek için **.NET 8 SDK** gerekir (`winget install Microsoft.DotNet.SDK.8`); Visual Studio gerekmez, NuGet paketleri ilk derlemede indirilir.
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File build.ps1
+dotnet build WinUI\DnsPilot.WinUI.csproj -c Debug -p:Platform=x64
 ```
 
-Çıktı: `bin\DnsDegistirici.exe`. DNS ayarlarını değiştirebilmek için uygulama yönetici izniyle açılır. Zapret motoru ilk kullanımda **Ayarlar → Güncellemeler** sayfasından indirilir.
+Çıktı: `bin\winui\DnsPilot.exe`. DNS ayarlarını değiştirebilmek için uygulama yönetici izniyle açılır. Zapret motoru ilk kullanımda **Ayarlar → Güncellemeler** sayfasından indirilir.
 </details>
 
 ## 🧭 Nasıl kullanılır
@@ -96,16 +96,24 @@ powershell -ExecutionPolicy Bypass -File build.ps1
 
 | Komut | Çıktı |
 |---|---|
-| `powershell -ExecutionPolicy Bypass -File build.ps1` | `bin\DnsDegistirici.exe` |
+| `dotnet build WinUI\DnsPilot.WinUI.csproj -c Debug -p:Platform=x64` | `bin\winui\DnsPilot.exe` (geliştirme; veri dosyaları üstteki `bin\`'de aranır) |
+| `powershell -ExecutionPolicy Bypass -File WinUI\publish.ps1` | `dist\winui-publish\` (.NET ve Windows App SDK gömülü dağıtım klasörü) |
+| `powershell -ExecutionPolicy Bypass -File build.ps1` | `bin\DnsDegistirici.exe` (eski WinForms sürümü, 1.x) |
 | `powershell -ExecutionPolicy Bypass -File installer\build-setup.ps1` | `dist\DNSPilot-Setup-<sürüm>.exe` (sessiz kurulum `/S`, kaldırma `/uninstall /S`) |
-| `powershell -ExecutionPolicy Bypass -File msix\build-msix.ps1 -Tools <SDK x64> -Engine bin\zapret\motor` | `dist\DNSPilot.msix` (Microsoft Store paketi) |
+| `powershell -ExecutionPolicy Bypass -File msix\build-msix.ps1 -Tools <SDK x64> -Engine bin\zapret\motor` | `dist\DNSPilot.msix` (Microsoft Store paketi; `-Out` ile ad verilebilir) |
+
+Kurucu ve MSIX, yayın klasörünü (`dist\winui-publish\`) kullanır; yoksa önce `WinUI\publish.ps1` çalıştırılır. `<SDK x64>`: `%USERPROFILE%\.nuget\packages\microsoft.windows.sdk.buildtools\<sürüm>\bin\<sürüm>\x64`.
 </details>
 
 <details>
 <summary><b>Proje yapısı</b></summary>
 
 ```
-src/            Uygulama (C#, WinForms, .NET Framework 4.8)
+WinUI/          Uygulama arayüzü (WinUI 3, .NET 8): pencere, sayfalar, tepsi menüsü, bildirimler
+  AppController.cs İşler: DNS, Zapret, strateji testi, güncellemeler, otomatik başlatma
+  Pages/          Giriş, DNS, Zapret, Sistem, Güncellemeler (Windows Ayarlar kartları)
+  TrayMenuHost.cs Windows 11 tarzı tepsi menüsü (akrilik)
+src/            Paylaşılan mantık + eski WinForms arayüzü (.NET Framework 4.8)
   Tray.cs         Bildirim alanı, menü, güncellemeler, otomatik başlatma
   SettingsForm.cs Windows 11 tarzı Ayarlar penceresi
   Dns.cs          DNS ve DoH ayarları, hız testi

@@ -78,10 +78,6 @@ powershell -ExecutionPolicy Bypass -File build.ps1
 
 ## 🧭 Nasıl kullanılır
 
-| 🖱️ Sağ Tık | 🖱️ Sol Tık |
-|:---:|:---:|
-| DNS sunucusu seçin, Zapret'i başlatın ya da durdurun | Ayarlar: Giriş, DNS, Zapret, Sistem, Güncellemeler |
-
 ### Simgedeki nokta ne anlatır?
 
 <p align="center">

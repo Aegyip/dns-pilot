@@ -19,7 +19,8 @@
   <a href="#-öne-çıkanlar">Öne çıkanlar</a> ·
   <a href="#-ekran-görüntüleri">Ekran görüntüleri</a> ·
   <a href="#-kurulum">Kurulum</a> ·
-  <a href="#-nasıl-kullanılır">Kullanım</a>
+  <a href="#-nasıl-kullanılır">Kullanım</a> ·
+  <a href="https://github.com/Aegyip/dns-pilot/issues/new?template=hata-bildirimi.yml">Hata bildir</a>
 </p>
 
 ---

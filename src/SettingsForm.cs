@@ -807,6 +807,15 @@ namespace DnsDegistirici
                 new SettingCard("", "DNS Pilot",
                     "Sürüm " + typeof(SettingsForm).Assembly.GetName().Version.ToString(2) +
                     " · Zapret motoru " + ShortSha(Zapret.CurrentVersion())));
+
+            Section(s, "Destek");
+            var report = new SettingCard("", "Hata bildir",
+                "GitHub'da bir hata kaydı açar. Sürüm bilgileri otomatik doldurulur; göndermeden önce her şeyi görebilirsiniz.",
+                Button("Hata bildir", BugReport.Open, true, true));
+            report.GlyphColor = Ui.P.Accent;
+            Group(s, Ui.D(8), report,
+                new SettingCard("", "Kaynak kodu", "DNS Pilot açık kaynaktır: github.com/Aegyip/dns-pilot")
+                    .OnClick((o, e) => { try { Process.Start(BugReport.RepoUrl); } catch (Exception) { } }));
         }
     }
 }

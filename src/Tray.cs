@@ -188,6 +188,7 @@ namespace DnsDegistirici
 
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("Ayarlar", null, (s, e) => OpenSettings(null));
+            menu.Items.Add("Hata bildir", null, (s, e) => BugReport.Open());
             menu.Items.Add("Çıkış", null, (s, e) => Quit());
         }
 

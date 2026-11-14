@@ -146,8 +146,6 @@ DNS Pilot hiçbir kişisel veri toplamaz ve geliştiriciye veri göndermez. Seç
 - [**Zapret**](https://github.com/bol-van/zapret) — bol-van; DPI aşma motoru
 - [**WinDivert**](https://github.com/basil00/WinDivert) — basil00; Windows paket yakalama sürücüsü
 
-## ⚠️ Sorumluluk
-
 <p align="center">
   <img src="docs/img/sorumluluk.png" alt="Sorumluluk: Yasalara ve ISS koşullarına uygun kullanım sizin sorumluluğunuzdadır. © 2026 Aegyip · DNS Pilot" width="100%">
 </p>

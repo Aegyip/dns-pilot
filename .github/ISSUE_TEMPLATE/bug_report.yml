@@ -1,0 +1,63 @@
+name: 🐞 Bug report
+description: Report a problem with DNS Pilot.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! If you came here from the **Report a bug** button in the app, the version details below are already filled in.
+        Please do not share personal information such as IP addresses or passwords.
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A short description of the problem.
+      placeholder: e.g. Discord does not load after starting Zapret.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open the tray menu
+        2. Click "Start Zapret"
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+  - type: input
+    id: version
+    attributes:
+      label: DNS Pilot version
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+  - type: input
+    id: install
+    attributes:
+      label: Installation type
+      placeholder: Microsoft Store / installer / built from source
+  - type: input
+    id: zapret
+    attributes:
+      label: Zapret status
+      description: Is it running, and which strategy is selected?
+  - type: input
+    id: isp
+    attributes:
+      label: Internet service provider and country (optional)
+      description: Helps with strategy-related issues.
+      placeholder: e.g. Türk Telekom, Turkey
+  - type: textarea
+    id: attachments
+    attributes:
+      label: Screenshots or additional context
+      description: You can drag and drop images here.

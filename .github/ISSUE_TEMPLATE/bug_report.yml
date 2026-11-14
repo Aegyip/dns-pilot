@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for taking the time to report a bug! If you came here from the **Report a bug** button in the app, the version details below are already filled in.
+        Thanks for taking the time to report a bug! If you came here from the bug report button in the app, the version details below are already filled in.
         Please do not share personal information such as IP addresses or passwords.
   - type: textarea
     id: description

@@ -35,11 +35,14 @@ namespace DnsPilot.Pages
             var strategies = Zapret.LoadStrategies();
             var strategy = AppController.CurrentStrategy(strategies);
 
-            s.Children.Add(Card("", "Zapret",
-                Zapret.Installed
-                    ? "Derin paket incelemesi (DPI) yoluyla uygulanan erişim kısıtlamalarını aşar. Discord gibi yalnızca DNS değişikliğiyle açılamayan hizmetler için gereklidir."
-                    : "Zapret motoru bulunamadı. Güncellemeler sayfasından yükleyebilirsiniz.",
-                Toggle(on, v => { if (v) App.StartZapret(); else App.StopZapret(); }, !App.Busy && Zapret.Installed)));
+            if (!Zapret.Installed && !Settings.Packaged)
+                s.Children.Add(EngineMissingCard());
+            else
+                s.Children.Add(Card("\uEA18", "Zapret",
+                    Zapret.Installed
+                        ? "Derin paket incelemesi (DPI) yoluyla uygulanan erişim kısıtlamalarını aşar. Discord gibi yalnızca DNS değişikliğiyle açılamayan hizmetler için gereklidir."
+                        : "Zapret motoru bulunamadı.",
+                    Toggle(on, v => { if (v) App.StartZapret(); else App.StopZapret(); }, !App.Busy && Zapret.Installed)));
 
             Section(s, "Yapılandırma");
             bool testing = App.StrategyTestRunning;

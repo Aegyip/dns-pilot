@@ -230,24 +230,32 @@ dns.google
             var a = new StringBuilder();
             string exe;
 
-            // Stratejiler yalnızca TLS/QUIC el sıkışmasına dokunduğu için sadece 80/443 yakalanır; işlemci yükü düşer.
+            // Yakalama ve işleme olabildiğince dar tutulur. Tüm stratejiler yalnızca TLS ClientHello'ya dokunur, bu yüzden:
+            //  - Yalnızca giden TCP 443 yakalanır. Eskiden 80 ve UDP 443 (QUIC) de yakalanıyordu; QUIC'te onay paketleri
+            //    de veri taşıdığından HTTP/3 indirmelerin her paketi kullanıcı alanına çekiliyor, yoğun indirmelerde
+            //    paketler gecikip düşüyor, büyük indirmeler ve bazı siteler/oyunlar kopuyordu.
+            //  - Profil yalnızca TLS bağlantılarına uygulanır (--filter-tcp=443 --filter-l7=tls).
+            //  - Bağlantı başına yalnızca ilk 10 veri paketi işlenir (zapret2: --out-range=-d10, zapret1: cutoff=d10);
+            //    el sıkışmadan sonraki trafik betiğe uğramadan geçer.
             if (s.Engine == 2)
             {
                 exe = "winws2.exe";
-                a.Append("--wf-l3=ipv4 --wf-tcp-out=80,443 --wf-udp-out=443 ");
+                a.Append("--wf-l3=ipv4 --wf-tcp-out=443");
+                foreach (var lua in new[] { "zapret-lib.lua", "zapret-antidpi.lua", "zapret-auto.lua" })
+                    a.Append(" --lua-init=" + Quote("@" + Path.Combine(EngineDir, "lua", lua)));
+                a.Append(" --filter-tcp=443 --filter-l7=tls");
+                if (s.Args.IndexOf("--out-range", StringComparison.OrdinalIgnoreCase) < 0) a.Append(" --out-range=-d10");
+                a.Append(" ");
             }
             else
             {
                 exe = "winws.exe";
-                a.Append("--wf-tcp=80,443 --wf-udp=443 ");
+                a.Append("--wf-tcp=443 --filter-tcp=443 ");
+                if (s.Args.IndexOf("--dpi-desync-cutoff", StringComparison.OrdinalIgnoreCase) < 0) a.Append("--dpi-desync-cutoff=d10 ");
             }
 
             if (!oob) a.Append("--hostlist-exclude=" + Quote(ExcludePath) + " ");
             a.Append(s.Args);
-
-            if (s.Engine == 2)
-                foreach (var lua in new[] { "zapret-lib.lua", "zapret-antidpi.lua", "zapret-auto.lua" })
-                    a.Append(" --lua-init=" + Quote("@" + Path.Combine(EngineDir, "lua", lua)));
 
             if (!oob && filter == FilterList) a.Append(" --hostlist=" + Quote(HostlistPath));
             if (!oob && filter == FilterAuto) a.Append(" --hostlist-auto=" + Quote(AutoHostlistPath));

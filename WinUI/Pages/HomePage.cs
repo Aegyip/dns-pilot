@@ -28,11 +28,14 @@ namespace DnsPilot.Pages
                 state.HasAdapter ? state.AdapterName + " bağlantısı · Sunucular: " + servers : "Etkin bir ağ bağlantısı algılanmadı.",
                 Btn("Değiştir", () => DnsPilot.App.Instance.ShowWindow("DNS"))));
 
-            s.Children.Add(Card("", "Zapret",
-                !Zapret.Installed ? "Zapret motoru bulunamadı."
-                : zapretOn ? "Etkin · " + (strategy != null ? strategy.Name : "Varsayılan") + " stratejisi kullanılıyor"
-                : "Devre dışı · Erişim kısıtlamalarını aşmak için etkinleştirin",
-                Toggle(zapretOn, on => { if (on) App.StartZapret(); else App.StopZapret(); }, !App.Busy && Zapret.Installed)));
+            if (!Zapret.Installed && !Settings.Packaged)
+                s.Children.Add(EngineMissingCard());
+            else
+                s.Children.Add(Card("\uEA18", "Zapret",
+                    !Zapret.Installed ? "Zapret motoru bulunamadı."
+                    : zapretOn ? "Etkin · " + (strategy != null ? strategy.Name : "Varsayılan") + " stratejisi kullanılıyor"
+                    : "Devre dışı · Erişim kısıtlamalarını aşmak için etkinleştirin",
+                    Toggle(zapretOn, on => { if (on) App.StartZapret(); else App.StopZapret(); }, !App.Busy && Zapret.Installed)));
 
             var u = App.Updates;
             if (!Settings.Packaged && u.ZapretAvailable && !u.Installing)

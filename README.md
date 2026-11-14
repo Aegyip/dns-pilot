@@ -98,7 +98,7 @@ dotnet build WinUI\DnsPilot.WinUI.csproj -c Debug -p:Platform=x64
 |---|---|
 | `dotnet build WinUI\DnsPilot.WinUI.csproj -c Debug -p:Platform=x64` | `bin\winui\DnsPilot.exe` (geliştirme; veri dosyaları üstteki `bin\`'de aranır) |
 | `powershell -ExecutionPolicy Bypass -File WinUI\publish.ps1` | `dist\winui-publish\` (.NET ve Windows App SDK gömülü dağıtım klasörü) |
-| `powershell -ExecutionPolicy Bypass -File build.ps1` | `bin\DnsDegistirici.exe` (eski WinForms sürümü, 1.x) |
+| `powershell -ExecutionPolicy Bypass -File build.ps1` | `bin\classic\DnsPilot.exe` (eski WinForms sürümü, 1.x) |
 | `powershell -ExecutionPolicy Bypass -File installer\build-setup.ps1` | `dist\DNSPilot-Setup-<sürüm>.exe` (sessiz kurulum `/S`, kaldırma `/uninstall /S`) |
 | `powershell -ExecutionPolicy Bypass -File msix\build-msix.ps1 -Tools <SDK x64> -Engine bin\zapret\motor` | `dist\DNSPilot.msix` (Microsoft Store paketi; `-Out` ile ad verilebilir) |
 

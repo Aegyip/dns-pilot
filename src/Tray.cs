@@ -616,7 +616,7 @@ namespace DnsDegistirici
     static class Autostart
     {
         // Store sürümü ayrı bir görev adı kullanır; klasik kurulumla çakışmaz.
-        static readonly string TaskName = Settings.Packaged ? "DNSPilot" : "DnsDegistirici";
+        static readonly string TaskName = Settings.Packaged ? "DNSPilot" : "\"DNS Pilot\""; // klasik: Görev Zamanlayıcı'da "DNS Pilot"
 
         public static bool IsEnabled()
         {

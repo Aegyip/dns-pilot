@@ -8,23 +8,24 @@ using Microsoft.Win32;
 
 [assembly: AssemblyTitle("DNS Pilot Kurulum")]
 [assembly: AssemblyProduct("DNS Pilot")]
-[assembly: AssemblyVersion("2.0.0.0")]
-[assembly: AssemblyFileVersion("2.0.0.0")]
+[assembly: AssemblyVersion("2.0.1.0")]
+[assembly: AssemblyFileVersion("2.0.1.0")]
 
 // DNS Pilot kurucusu. Uygulama (WinUI 3, .NET ve Windows App SDK dahil) bu dosyaya zip olarak gömülüdür.
 //   setup.exe                 → kurar (onay sorar, sonunda uygulamayı açar)
 //   setup.exe /S              → sessiz kurulum (Microsoft Store bunu kullanır)
 //   setup.exe /uninstall [/S] → kaldırır
-// Zapret motoru kurulumda yoktur; uygulama ilk kullanımda Güncellemeler sayfasından indirir.
+// Zapret motoru da kurulumla gelir (zapret\motor); ilk açılışta Zapret hemen kullanılabilir.
 static class Setup
 {
     const string AppName = "DNS Pilot";
-    const string Version = "2.0.0";
+    const string Version = "2.0.1";
     const string Publisher = "Ozan İnce";
     const string ExeName = "DnsPilot.exe";
     const string OldExeName = "DnsDegistirici.exe"; // 1.x (WinForms) sürümü
     const string UninstallKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\DNSPilot";
-    const string TaskName = "DnsDegistirici";
+    const string TaskName = "\"DNS Pilot\"";
+    const string LegacyTaskName = "DnsDegistirici"; // 1.x sürümünün görev adı
 
     static string InstallDir
     {
@@ -66,6 +67,8 @@ static class Setup
             return 1602; // ERROR_INSTALL_USEREXIT
 
         StopApp();
+        // Zapret çalıştıysa WinDivert sürücüsü yüklü kalır ve WinDivert64.sys kilitlidir; üzerine yazılabilmesi için durdurulur.
+        Run("sc.exe", "stop windivert");
         Directory.CreateDirectory(InstallDir);
         string exe = Path.Combine(InstallDir, ExeName);
         Extract(InstallDir);
@@ -111,6 +114,7 @@ static class Setup
 
         StopApp();
         Run("schtasks.exe", "/delete /tn " + TaskName + " /f");
+        Run("schtasks.exe", "/delete /tn " + LegacyTaskName + " /f");
         Run("sc.exe", "stop windivert");
         try { File.Delete(ShortcutPath); } catch (Exception) { }
         // Uygulamanın bildirim kimliği için oluşturduğu kullanıcı kısayolu ve kaydı (src\Notifications.cs).

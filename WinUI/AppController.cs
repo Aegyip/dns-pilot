@@ -275,6 +275,40 @@ namespace DnsPilot
             });
         }
 
+        // ---- Zapret motoru yoksa tek tıkla kurulum ----
+        // Kurulum programı motoru içerir; yine de silinmiş ya da eski bir kurulumdan kalmışsa buradan yüklenir.
+
+        volatile bool engineInstalling;
+        public bool EngineInstalling { get { return engineInstalling; } }
+
+        public void InstallEngine()
+        {
+            if (busy || engineInstalling || Settings.Packaged) return;
+            busy = true;
+            engineInstalling = true;
+            Changed();
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                string error = null;
+                try
+                {
+                    string latest = Zapret.LatestVersion();
+                    Zapret.Install(latest);
+                    UpdateState.SaveCheck(latest);
+                }
+                catch (Exception ex)
+                {
+                    error = "Zapret motoru indirilemedi. İnternet bağlantınızı denetleyip yeniden deneyin. (" + ex.Message + ")";
+                }
+                ui.TryEnqueue(() =>
+                {
+                    busy = false;
+                    engineInstalling = false;
+                    if (StateChanged != null) StateChanged();
+                    Notify("Zapret", error ?? "Zapret motoru yüklendi. Zapret'i şimdi etkinleştirebilirsiniz.", error != null);
+                });
+            });
+        }
         // ---- Güncellemeler ----
 
         volatile bool updateChecking, updateInstalling;
@@ -387,11 +421,15 @@ namespace DnsPilot
     // Yönetici yetkisiyle sessizce başlamak için görev zamanlayıcı (Run anahtarı her açılışta UAC sorar).
     static class Autostart
     {
-        static readonly string TaskName = Settings.Packaged ? "DNSPilot" : "DnsDegistirici";
+        // Görev Zamanlayıcı'da görünen ad. Store sürümü ayrı ad kullanır; klasik kurulumla çakışmaz.
+        static readonly string TaskName = Settings.Packaged ? "DNSPilot" : "DNS Pilot";
+        static string TaskArg { get { return "\"" + TaskName + "\""; } }
+        // 1.x (WinForms) sürümünün görev adı; ilk açılışta yeni ada taşınır.
+        const string LegacyTaskName = "DnsDegistirici";
 
         public static bool IsEnabled()
         {
-            return DnsManager.Run("schtasks.exe", "/query /tn " + TaskName, null) == 0;
+            return DnsManager.Run("schtasks.exe", "/query /tn " + TaskArg, null) == 0;
         }
 
         // Görev başka bir exe'yi (eski WinForms sürümü, taşınmış/yeniden kurulmuş kopya) çalıştırıyorsa
@@ -400,9 +438,15 @@ namespace DnsPilot
         {
             try
             {
+                if (!Settings.Packaged && DnsManager.Run("schtasks.exe", "/query /tn " + LegacyTaskName, null) == 0)
+                {
+                    // Eski adlı görev: aynı ayarla yeni adla oluştur, eskisini sil.
+                    if (Enable() == null) DnsManager.Run("schtasks.exe", "/delete /tn " + LegacyTaskName + " /f", null);
+                    return;
+                }
                 if (!IsEnabled()) return;
                 string text;
-                var psi = new System.Diagnostics.ProcessStartInfo("schtasks.exe", "/query /tn " + TaskName + " /xml")
+                var psi = new System.Diagnostics.ProcessStartInfo("schtasks.exe", "/query /tn " + TaskArg + " /xml")
                 {
                     UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true,
                     StandardOutputEncoding = Encoding.GetEncoding(System.Globalization.CultureInfo.CurrentCulture.TextInfo.OEMCodePage),
@@ -447,7 +491,7 @@ namespace DnsPilot
             string file = Path.Combine(Path.GetTempPath(), "DnsPilot-task.xml");
             File.WriteAllText(file, xml, Encoding.Unicode);
             var log = new StringBuilder();
-            DnsManager.Run("schtasks.exe", "/create /tn " + TaskName + " /xml \"" + file + "\" /f", log);
+            DnsManager.Run("schtasks.exe", "/create /tn " + TaskArg + " /xml \"" + file + "\" /f", log);
             File.Delete(file);
             return log.Length == 0 ? null : log.ToString();
         }
@@ -455,7 +499,7 @@ namespace DnsPilot
         public static string Disable()
         {
             var log = new StringBuilder();
-            DnsManager.Run("schtasks.exe", "/delete /tn " + TaskName + " /f", log);
+            DnsManager.Run("schtasks.exe", "/delete /tn " + TaskArg + " /f", log);
             return log.Length == 0 ? null : log.ToString();
         }
     }

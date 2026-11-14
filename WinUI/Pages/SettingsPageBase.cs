@@ -116,6 +116,21 @@ namespace DnsPilot.Pages
             return tb;
         }
 
+        // Zapret motoru yüklü değilse gösterilen kart: soluk anahtar yerine "Motoru yükle".
+        protected SettingsCard EngineMissingCard()
+        {
+            object action;
+            if (App.EngineInstalling)
+                action = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal, Spacing = 10,
+                    Children = { new ProgressRing { IsActive = true, Width = 20, Height = 20 }, new TextBlock { Text = "Yükleniyor…", VerticalAlignment = VerticalAlignment.Center } }
+                };
+            else
+                action = Btn("Motoru yükle", App.InstallEngine, !App.Busy, true);
+            return Card("\uEA18", "Zapret",
+                "Zapret motoru henüz yüklü değil. Erişim kısıtlamalarını aşabilmek için motoru yükleyin; birkaç saniye sürer.", action);
+        }
         protected static void OpenInNotepad(string path)
         {
             Process.Start(new ProcessStartInfo("notepad.exe", "\"" + path + "\"") { UseShellExecute = false });

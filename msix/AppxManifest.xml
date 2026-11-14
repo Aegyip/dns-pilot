@@ -9,7 +9,7 @@
   xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
   IgnorableNamespaces="uap uap3 desktop rescap">
 
-  <Identity Name="Aegyip.DNSPilot" Publisher="CN=05566F3D-DB44-4AE1-8BAA-3D73B26508DA" Version="2.0.0.0" ProcessorArchitecture="x64" />
+  <Identity Name="Aegyip.DNSPilot" Publisher="CN=05566F3D-DB44-4AE1-8BAA-3D73B26508DA" Version="2.0.1.0" ProcessorArchitecture="x64" />
 
   <Properties>
     <DisplayName>DNS Pilot</DisplayName>

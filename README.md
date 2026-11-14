@@ -41,16 +41,9 @@
   <img src="docs/img/uygulama-turu.gif" alt="DNS Pilot uygulama turu" width="100%">
 </p>
 
-<table>
-  <tr>
-    <td width="50%"><img src="store/1-giris.png" alt="Giriş sayfası"><p align="center"><sub><b>Giriş</b> — DNS ve Zapret durumu, hızlı araçlar</sub></p></td>
-    <td width="50%"><img src="store/2-zapret.png" alt="Zapret sayfası"><p align="center"><sub><b>Zapret</b> — strateji, site listesi, otomatik başlatma</sub></p></td>
-  </tr>
-  <tr>
-    <td width="50%"><img src="store/4-dns-hiz-testi.png" alt="DNS sayfası ve hız testi"><p align="center"><sub><b>DNS</b> — sunucu seçimi ve hız testi</sub></p></td>
-    <td width="50%"><img src="store/3-tepsi-menusu.png" alt="Tepsi menüsü"><p align="center"><sub><b>Tepsi menüsü</b> — en sık kullanılanlar tek tıkta</sub></p></td>
-  </tr>
-</table>
+<p align="center">
+  <img src="docs/img/ekranlar.png" alt="Giriş, Zapret, DNS ve hız testi sayfaları ile tepsi menüsü" width="100%">
+</p>
 
 ## 📦 Kurulum
 

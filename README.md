@@ -32,16 +32,9 @@
 
 ## ✨ Öne çıkanlar
 
-| | |
-|---|---|
-| 🔒 **Şifreli DNS** | Cloudflare, Google, Quad9 ve AdGuard hazır gelir. DNS over HTTPS (DoH) ile sorgularınız servis sağlayıcınızdan gizlenir. Geçmeden önce bağlantı test edilir; ulaşılamayan sunucuya geçilmez. |
-| 🛡️ **Zapret ile erişim** | Discord gibi yalnızca DNS değiştirerek açılmayan hizmetler için, derin paket incelemesine (DPI) karşı açık kaynaklı Zapret motorunu tek tıkla başlatır. |
-| 🎯 **En uygun strateji** | Tüm stratejileri kendi bağlantınızda sırayla dener, kısıtlanan hizmetlere en hızlı erişimi sağlayanı otomatik seçer. |
-| 🟢 **Anlık durum** | Bildirim alanındaki simgenin noktası bağlantınızın durumunu gösterir: şifreli, şifresiz, ISS ya da bağlantı yok. |
-| ⚡ **Araçlar** | DNS hız testi, tek tıkla DNS önbelleğini temizleme, kendi DNS profillerinizi ekleme. |
-| 🪟 **Windows 11 tasarımı** | Ayarlar penceresi Windows 11 Ayarlar uygulamasının düzenini izler; açık ve koyu temaya kendiliğinden uyar. |
-| 🚀 **Windows ile başlat** | Oturum açıldığında yönetici onayı sormadan bildirim alanında başlar; Zapret'i de otomatik açabilir. |
-| 🙈 **Gizlilik** | Hesap, reklam, analiz ya da telemetri yok. Ayarlar yalnızca bilgisayarınızda saklanır. |
+<p align="center">
+  <img src="docs/img/ozellikler.png" alt="Şifreli DNS, Zapret ile erişim, en uygun strateji, anlık durum, hız testi, Windows 11 tasarımı, Windows ile başlat, gizlilik" width="100%">
+</p>
 
 ## 🖼️ Ekran görüntüleri
 
@@ -62,10 +55,18 @@
 
 ## 📦 Kurulum
 
-### Microsoft Store
-DNS Pilot, Microsoft Store incelemesindedir. Yayımlandığında [Store sayfasından](https://apps.microsoft.com/detail/9PL0M0W0MP7L) tek tıkla kurulabilecek ve güncellemeleri otomatik alacaktır.
+<p align="center">
+  <img src="docs/img/kurulum.png" alt="1. Microsoft Store'dan edinin, 2. yönetici iznine Evet deyin, 3. DNS Pilot bildirim alanında hazır" width="100%">
+</p>
 
-### Kaynaktan derleme
+<p align="center">
+  <a href="https://apps.microsoft.com/detail/9PL0M0W0MP7L"><img src="https://img.shields.io/badge/Microsoft%20Store'dan%20edinin-0078D4?style=for-the-badge&logo=microsoftstore&logoColor=white" alt="Microsoft Store'dan edinin"></a>
+  <br><sub>Store incelemesi sürüyor; yayımlandığında bu bağlantı etkinleşir. Güncellemeler Store üzerinden otomatik gelir.</sub>
+</p>
+
+<details>
+<summary><b>Kaynaktan derleme</b></summary>
+
 Ek bir kurulum gerekmez; Windows'un yerleşik .NET Framework 4.8 derleyicisi kullanılır.
 
 ```powershell
@@ -73,26 +74,25 @@ powershell -ExecutionPolicy Bypass -File build.ps1
 ```
 
 Çıktı: `bin\DnsDegistirici.exe`. DNS ayarlarını değiştirebilmek için uygulama yönetici izniyle açılır. Zapret motoru ilk kullanımda **Ayarlar → Güncellemeler** sayfasından indirilir.
+</details>
 
 ## 🧭 Nasıl kullanılır
 
-1. **DNS Pilot**'u açın; bildirim alanında logo simgesi belirir.
-2. **Sağ tık:** DNS sunucusu seçin, Zapret'i başlatın ya da durdurun.
-3. **Sol tık:** Ayarlar penceresi açılır — Giriş, DNS, Zapret, Sistem ve Güncellemeler sayfaları.
+| 🖱️ Sağ Tık | 🖱️ Sol Tık |
+|:---:|:---:|
+| DNS sunucusu seçin, Zapret'i başlatın ya da durdurun | Ayarlar: Giriş, DNS, Zapret, Sistem, Güncellemeler |
 
-**Simgedeki nokta ne anlatır?**
+### Simgedeki nokta ne anlatır?
 
-| Nokta | Anlamı |
-|:---:|---|
-| 🟢 | Şifreli DNS (DoH) etkin |
-| 🟣 | Özel DNS, şifresiz |
-| ⚪ | Modemin / servis sağlayıcının DNS'i |
-| 🟠 | Zapret çalışıyor |
-| 🔴 | Bağlantı yok |
+<p align="center">
+  <img src="docs/img/durum.png" alt="Yeşil: şifreli DNS, mor: özel şifresiz DNS, gri: modem/ISS, turuncu: Zapret çalışıyor, kırmızı: bağlantı yok" width="100%">
+</p>
 
-### DNS ile Zapret arasındaki fark
-- **DNS** — Servis sağlayıcının DNS yönlendirmesini aşar ve DNS trafiğini şifreler.
-- **Zapret** — DPI ile uygulanan kısıtlamaları aşar. Bazı hizmetler için yalnızca DNS değiştirmek yetmez; Zapret başlarken DNS şifresizse uygulama otomatik olarak şifreli bir sunucuya geçer.
+### DNS mi, Zapret mi?
+
+<p align="center">
+  <img src="docs/img/dns-zapret.png" alt="DNS: ISS yönlendirmesini aşar ve sorguları şifreler. Zapret: DPI kısıtlamalarını aşar." width="100%">
+</p>
 
 > [!TIP]
 > Hangi stratejinin size uygun olduğunu bilmiyorsanız **Ayarlar → Zapret → En uygun stratejiyi bul**'u kullanın. Yaklaşık bir dakika içinde bağlantınızda en iyi çalışanı seçer.

@@ -19,8 +19,7 @@
   <a href="#-öne-çıkanlar">Öne çıkanlar</a> ·
   <a href="#-ekran-görüntüleri">Ekran görüntüleri</a> ·
   <a href="#-kurulum">Kurulum</a> ·
-  <a href="#-nasıl-kullanılır">Kullanım</a> ·
-  <a href="#-geliştirme">Geliştirme</a>
+  <a href="#-nasıl-kullanılır">Kullanım</a>
 </p>
 
 ---
@@ -98,13 +97,15 @@ powershell -ExecutionPolicy Bypass -File build.ps1
 - Bir site bozulursa **Zapret'i durdurun** ya da başka bir strateji deneyin.
 - Uygulamadan çıkıldığında Zapret de kapanır.
 
-## 🛠️ Geliştirme
+<details>
+<summary><b>🛠️ Geliştirme</b></summary>
 
 | Komut | Çıktı |
 |---|---|
 | `powershell -ExecutionPolicy Bypass -File build.ps1` | `bin\DnsDegistirici.exe` |
 | `powershell -ExecutionPolicy Bypass -File installer\build-setup.ps1` | `dist\DNSPilot-Setup-<sürüm>.exe` (sessiz kurulum `/S`, kaldırma `/uninstall /S`) |
 | `powershell -ExecutionPolicy Bypass -File msix\build-msix.ps1 -Tools <SDK x64> -Engine bin\zapret\motor` | `dist\DNSPilot.msix` (Microsoft Store paketi) |
+</details>
 
 <details>
 <summary><b>Proje yapısı</b></summary>
@@ -141,10 +142,12 @@ Klasik kurulumda bu dosyalar exe'nin yanında, Microsoft Store sürümünde uygu
   <img src="docs/img/gizlilik.png" alt="Gizlilik: Kişisel veri toplanmaz; test sonuçları cihazınızdan çıkmaz." width="100%">
 </p>
 
-## 🙏 Teşekkürler
+<details>
+<summary><b>🙏 Teşekkürler</b></summary>
 
 - [**Zapret**](https://github.com/bol-van/zapret) — bol-van; DPI aşma motoru
 - [**WinDivert**](https://github.com/basil00/WinDivert) — basil00; Windows paket yakalama sürücüsü
+</details>
 
 <p align="center">
   <img src="docs/img/sorumluluk.png" alt="Sorumluluk: Yasalara ve ISS koşullarına uygun kullanım sizin sorumluluğunuzdadır. © 2026 Aegyip · DNS Pilot" width="100%">

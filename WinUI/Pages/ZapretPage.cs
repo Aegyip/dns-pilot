@@ -43,6 +43,7 @@ namespace DnsPilot.Pages
                         ? "Derin paket incelemesi (DPI) yoluyla uygulanan erişim kısıtlamalarını aşar. Discord gibi yalnızca DNS değişikliğiyle açılamayan hizmetler için gereklidir."
                         : "Zapret motoru bulunamadı.",
                     Toggle(on, v => { if (v) App.StartZapret(); else App.StopZapret(); }, !App.Busy && Zapret.Installed)));
+            ZapretErrorBar(s);
 
             Section(s, "Yapılandırma");
             bool testing = App.StrategyTestRunning;

@@ -129,7 +129,28 @@ namespace DnsPilot.Pages
             else
                 action = Btn("Motoru yükle", App.InstallEngine, !App.Busy, true);
             return Card("\uEA18", "Zapret",
-                "Zapret motoru henüz yüklü değil. Erişim kısıtlamalarını aşabilmek için motoru yükleyin; birkaç saniye sürer.", action);
+                DnsDegistirici.Zapret.EngineRemoved
+                    ? "Zapret dosyaları silinmiş. Bu genellikle antivirüsün winws2.exe / WinDivert dosyalarını karantinaya almasıyla olur. " +
+                      "Antivirüste şu klasörü istisnalara ekleyip motoru yeniden yükleyin: " + DnsDegistirici.Zapret.EngineDir
+                    : "Zapret motoru henüz yüklü değil. Erişim kısıtlamalarını aşabilmek için motoru yükleyin; birkaç saniye sürer.", action);
+        }
+
+        // Son Zapret hatası; kapatılana veya Zapret başarıyla açılana kadar görünür kalır.
+        protected void ZapretErrorBar(StackPanel s)
+        {
+            string error = App.ZapretError;
+            if (error == null) return;
+            var bar = new InfoBar
+            {
+                IsOpen = true,
+                IsClosable = true,
+                Severity = InfoBarSeverity.Error,
+                Title = "Zapret açılamadı",
+                Message = AppController.Clip(error, 900),
+                Margin = new Thickness(0, 4, 0, 0),
+            };
+            bar.Closed += (sender, e) => App.ClearZapretError();
+            s.Children.Add(bar);
         }
         protected static void OpenInNotepad(string path)
         {

@@ -184,6 +184,16 @@ dns.google
             get { return File.Exists(Path.Combine(EngineDir, "winws2.exe")); }
         }
 
+        // Motor klasörü var ama winws2.exe yok: kurulmuş, sonra silinmiş. Neredeyse her zaman antivirüs karantinasıdır.
+        public static bool EngineRemoved
+        {
+            get { return !Installed && Directory.Exists(EngineDir); }
+        }
+
+        public const string AntivirusHint =
+            "Antivirüs programınız zapret dosyalarını (winws2.exe, WinDivert) silmiş olabilir. Antivirüsün karantina / koruma geçmişinden " +
+            "dosyaları geri yükleyip şu klasörü istisnalara ekleyin, ardından motoru yeniden yükleyin: ";
+
         public static List<ZapretStrategy> LoadStrategies()
         {
             EnsureFile(StrategiesPath, DefaultStrategies);
@@ -221,8 +231,9 @@ dns.google
         // Hata yoksa null, varsa hata metni döner.
         public static string Start(ZapretStrategy s, string filter)
         {
-            if (!Installed) return "Zapret dosyaları bulunamadı: " + EngineDir;
+            if (!Installed) return "Zapret dosyaları bulunamadı. " + AntivirusHint + EngineDir;
             Stop();
+            RemoveForeignDriver();
             EnsureUserFiles();
 
             // OOB stratejileri hostlist ile çalışmaz (zapret-win-turkey notu).
@@ -279,10 +290,58 @@ dns.google
             if (p.WaitForExit(1500))
             {
                 p.WaitForExit(); // kalan çıktının toplanması için
-                lock (output)
-                    return "Zapret hemen kapandı (kod " + p.ExitCode + ").\n" + output.ToString().Trim();
+                string text;
+                lock (output) text = output.ToString().Trim();
+                return "Zapret hemen kapandı (kod " + p.ExitCode + ")." + FailureHint(text) + "\n\n" + text;
             }
             return null;
+        }
+
+        // Hemen kapanmanın bilinen nedenleri için anlaşılır bir açıklama.
+        static string FailureHint(string text)
+        {
+            var other = new List<string>();
+            foreach (var name in new[] { "goodbyedpi", "byedpi", "ciadpi" })
+                foreach (var p in Process.GetProcessesByName(name)) { other.Add(p.ProcessName + ".exe"); p.Dispose(); }
+            if (other.Count > 0)
+                return " Başka bir DPI aracı çalışıyor (" + string.Join(", ", other.Distinct()) + "); kapatıp yeniden deneyin.";
+            if (text.IndexOf("divert", StringComparison.OrdinalIgnoreCase) >= 0)
+                return " WinDivert sürücüsü açılamadı. Antivirüs, oyun hile korumaları (Vanguard, FACEIT vb.) veya başka bir DPI aracı " +
+                       "(GoodbyeDPI, başka bir zapret paketi) buna engel olabilir.";
+            return "";
+        }
+
+        // GoodbyeDPI ya da başka bir zapret paketi "windivert" sürücü hizmetini kendi klasöründeki WinDivert64.sys ile
+        // kaydetmiş olabilir. O klasör silinmişse veya sürücü sürümü farklıysa winws açılır açılmaz kapanır.
+        // Hizmet bizim dosyamızı göstermiyorsa kaldırılır; winws açılırken kendi sürücüsüyle yeniden kaydeder.
+        static void RemoveForeignDriver()
+        {
+            try
+            {
+                var m = Regex.Match(Capture("sc.exe", "qc windivert"), @"BINARY_PATH_NAME\s*:\s*(.+)");
+                if (!m.Success) return; // hizmet yok
+                string path = m.Groups[1].Value.Trim();
+                if (path.StartsWith(@"\??\")) path = path.Substring(4);
+                string ours = Path.Combine(EngineDir, "WinDivert64.sys");
+                if (string.Equals(Path.GetFullPath(path), Path.GetFullPath(ours), StringComparison.OrdinalIgnoreCase)) return;
+                Capture("sc.exe", "stop windivert");
+                Capture("sc.exe", "delete windivert");
+            }
+            catch (Exception) { }
+        }
+
+        static string Capture(string file, string args)
+        {
+            var psi = new ProcessStartInfo(file, args);
+            psi.UseShellExecute = false;
+            psi.CreateNoWindow = true;
+            psi.RedirectStandardOutput = true;
+            using (var p = Process.Start(psi))
+            {
+                string text = p.StandardOutput.ReadToEnd();
+                p.WaitForExit(10000);
+                return text;
+            }
         }
 
         public static void Stop()
@@ -332,8 +391,10 @@ dns.google
             ZipFile.ExtractToDirectory(zip, extract);
 
             var src = Directory.GetDirectories(extract, "zapret-winws", SearchOption.AllDirectories).FirstOrDefault();
-            if (src == null || !File.Exists(Path.Combine(src, "winws2.exe")))
+            if (src == null)
                 throw new Exception("İndirilen pakette zapret-winws bulunamadı.");
+            if (!File.Exists(Path.Combine(src, "winws2.exe")))
+                throw new Exception("winws2.exe indirildi ama hemen silindi. " + AntivirusHint + EngineDir);
             Directory.Move(src, fresh);
 
             // Sürücü yüklüyken WinDivert64.sys kilitli kalır.

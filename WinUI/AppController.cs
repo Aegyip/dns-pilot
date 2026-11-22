@@ -29,6 +29,21 @@ namespace DnsPilot
 
         public bool Busy { get { return busy; } }
 
+        // Son Zapret hatası. Tepsi bildirimi kolayca kaçırılır (bildirimler kapalı, odak modu); sayfalarda da gösterilir.
+        public string ZapretError { get; private set; }
+
+        public void ClearZapretError()
+        {
+            ZapretError = null;
+            Changed();
+        }
+
+        void SetZapretError(string error)
+        {
+            ZapretError = error;
+            if (error != null) Trace.Log("Zapret: " + error.Replace("\n", " | "));
+        }
+
         public void Init(DispatcherQueue queue)
         {
             ui = queue;
@@ -158,7 +173,10 @@ namespace DnsPilot
             string note = "";
             RunBusy(() => "Zapret etkin: " + strategy.Name + note, () =>
             {
-                string error = Zapret.Start(strategy, filter);
+                string error;
+                try { error = Zapret.Start(strategy, filter); }
+                catch (Exception ex) { error = "Zapret başlatılamadı: " + ex.Message; }
+                SetZapretError(error);
                 if (error != null || !autoDns) return error;
 
                 // Servis sağlayıcılar kısıtlı sitelerin şifresiz DNS sorgularını yanıtlamıyor; zapret tek başına yetmez.
@@ -174,6 +192,7 @@ namespace DnsPilot
 
         public void StopZapret()
         {
+            ZapretError = null;
             RunBusy(() => "Zapret durduruldu.", () => { Zapret.Stop(); return null; });
         }
 
@@ -296,10 +315,18 @@ namespace DnsPilot
                     Zapret.Install(latest);
                     UpdateState.SaveCheck(latest);
                 }
-                catch (Exception ex)
+                catch (System.Net.WebException ex)
                 {
                     error = "Zapret motoru indirilemedi. İnternet bağlantınızı denetleyip yeniden deneyin. (" + ex.Message + ")";
                 }
+                catch (Exception ex)
+                {
+                    // Antivirüs çıkarılan dosyayı engellediğinde de buraya düşülür (ör. "dosya virüs içeriyor").
+                    error = "Zapret motoru yüklenemedi: " + ex.Message;
+                    if (ex.Message.IndexOf(Zapret.AntivirusHint, StringComparison.Ordinal) < 0)
+                        error += "\n" + Zapret.AntivirusHint + Zapret.EngineDir;
+                }
+                SetZapretError(error);
                 ui.TryEnqueue(() =>
                 {
                     busy = false;

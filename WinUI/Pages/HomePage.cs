@@ -36,6 +36,7 @@ namespace DnsPilot.Pages
                     : zapretOn ? "Etkin · " + (strategy != null ? strategy.Name : "Varsayılan") + " stratejisi kullanılıyor"
                     : "Devre dışı · Erişim kısıtlamalarını aşmak için etkinleştirin",
                     Toggle(zapretOn, on => { if (on) App.StartZapret(); else App.StopZapret(); }, !App.Busy && Zapret.Installed)));
+            ZapretErrorBar(s);
 
             var u = App.Updates;
             if (!Settings.Packaged && u.ZapretAvailable && !u.Installing)

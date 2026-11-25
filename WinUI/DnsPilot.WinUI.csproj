@@ -14,7 +14,7 @@
     <AssemblyName>DnsPilot</AssemblyName>
     <AssemblyTitle>DNS Pilot</AssemblyTitle>
     <Product>DNS Pilot</Product>
-    <Version>2.1.0</Version>
+    <Version>2.1.1</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>..\src\app.ico</ApplicationIcon>
     <Platforms>x64</Platforms>

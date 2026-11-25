@@ -8,8 +8,8 @@ using Microsoft.Win32;
 
 [assembly: AssemblyTitle("DNS Pilot Kurulum")]
 [assembly: AssemblyProduct("DNS Pilot")]
-[assembly: AssemblyVersion("2.1.0.0")]
-[assembly: AssemblyFileVersion("2.1.0.0")]
+[assembly: AssemblyVersion("2.1.1.0")]
+[assembly: AssemblyFileVersion("2.1.1.0")]
 
 // DNS Pilot kurucusu. Uygulama (WinUI 3, .NET ve Windows App SDK dahil) bu dosyaya zip olarak gömülüdür.
 //   setup.exe                 → kurar (onay sorar, sonunda uygulamayı açar)
@@ -19,7 +19,7 @@ using Microsoft.Win32;
 static class Setup
 {
     const string AppName = "DNS Pilot";
-    const string Version = "2.1.0";
+    const string Version = "2.1.1";
     const string Publisher = "Ozan İnce";
     const string ExeName = "DnsPilot.exe";
     const string OldExeName = "DnsDegistirici.exe"; // 1.x (WinForms) sürümü

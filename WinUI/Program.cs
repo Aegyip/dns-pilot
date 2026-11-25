@@ -27,8 +27,14 @@ namespace DnsPilot
                 return ResetDnsForUninstall();
 
             bool created;
-            using (new Mutex(true, MutexName, out created))
+            using (var mutex = new Mutex(true, MutexName, out created))
             {
+                // "Yönetici olarak yeniden başlat": eski kopya kapanırken yenisi birkaç saniye bekler.
+                if (!created && args.Any(a => string.Equals(a, "--yeniden", StringComparison.OrdinalIgnoreCase)))
+                {
+                    try { created = mutex.WaitOne(15000); }
+                    catch (AbandonedMutexException) { created = true; }
+                }
                 if (!created)
                 {
                     // Zaten çalışıyor: çalışan kopyanın penceresini öne getir.

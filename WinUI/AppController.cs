@@ -285,10 +285,45 @@ namespace DnsPilot
             return s.Length <= max ? s : s.Substring(0, max - 1) + "…";
         }
 
+        // ---- Yönetici izni ----
+        // Uygulama normalde her açılışta yönetici izni ister. Yine de izinsiz çalışıyorsa (ör. kısayol/uyumluluk ayarı,
+        // standart kullanıcı hesabı) DNS ve Zapret işleri anlaşılmaz Windows hatalarıyla düşmek yerine baştan durdurulur
+        // ve sayfalarda "Yönetici olarak yeniden başlat" gösterilir.
+
+        public static readonly bool Elevated = Zapret.IsElevated;
+
+        const string DnsElevationMessage =
+            "DNS ayarlarını değiştirmek yönetici izni gerektirir, ancak DNS Pilot yönetici izniyle çalışmıyor. " +
+            "\"Yönetici olarak yeniden başlat\" düğmesini kullanın.";
+
+        // Yönetici izniyle yeni bir kopya açar ve bu kopyayı kapatır. İzin isteği reddedilirse hiçbir şey değişmez.
+        public void RestartElevated()
+        {
+            try
+            {
+                var psi = new ProcessStartInfo(Environment.ProcessPath, "--yeniden") { UseShellExecute = true, Verb = "runas" };
+                Process.Start(psi);
+            }
+            catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223) // kullanıcı "Hayır" dedi
+            {
+                return;
+            }
+            Diag.Log("yönetici olarak yeniden başlatılıyor");
+            App.Instance.ExitApp();
+        }
+
         // ---- Açılış ve kapanış ----
 
         public void StartBackgroundWork()
         {
+            if (!Elevated)
+            {
+                // İzinsiz kopya başlangıç görevini kendi yoluna yönlendirmeye, Zapret'i başlatmaya ya da DNS'i geri
+                // almaya çalışmaz; bunların hepsi zaten başarısız olur.
+                Diag.Log("yönetici izni yok: arka plan işleri atlandı");
+                return;
+            }
+
             ThreadPool.QueueUserWorkItem(delegate
             {
                 try { Autostart.RepairIfStale(); } catch (Exception ex) { Diag.Error("başlangıç görevi onarımı", ex); }
@@ -353,6 +388,7 @@ namespace DnsPilot
                 Work = () =>
                 {
                     Step("sunucu deneniyor");
+                    if (!Elevated) return DnsElevationMessage;
                     ForgetSavedDns(); // kullanıcı DNS'i kendisi seçti; Zapret dururken geri alınmasın
                     return DnsManager.Apply(profile);
                 },
@@ -367,7 +403,7 @@ namespace DnsPilot
                 Kind = "dns",
                 Title = "Otomatik DNS ayarına dönülüyor",
                 DnsTarget = "",
-                Work = () => { ForgetSavedDns(); return DnsManager.ResetToDhcp(); },
+                Work = () => { if (!Elevated) return DnsElevationMessage; ForgetSavedDns(); return DnsManager.ResetToDhcp(); },
                 Success = () => "Otomatik DNS ayarına dönüldü.",
             });
         }
@@ -395,7 +431,7 @@ namespace DnsPilot
                     Kind = "dns",
                     Title = active.Name + " yeniden uygulanıyor",
                     DnsTarget = active.Name,
-                    Work = () => DnsManager.Apply(active),
+                    Work = () => Elevated ? DnsManager.Apply(active) : DnsElevationMessage,
                 });
             else RaiseUi();
         }
@@ -438,6 +474,7 @@ namespace DnsPilot
         {
             string saved = SavedDns;
             if (saved == null) return null;
+            if (!Elevated) return DnsElevationMessage; // kayıt silinmez; yönetici izniyle açılınca geri alınır
             ForgetSavedDns();
             if (!RestoreDnsOnStop) return null;
             Diag.Log("önceki DNS geri yükleniyor: " + saved);
@@ -541,6 +578,7 @@ namespace DnsPilot
         {
             if (testRunning) { testCancel = true; TestStatus("Durduruluyor…"); return; }
             if (!snapshot.ZapretInstalled) return;
+            if (!Elevated) { StrategyTestStatus = Zapret.ElevationMessage; RaiseUi(); return; }
             testRunning = true;
             testCancel = false;
             StrategyTestStatus = "Sırada…";
@@ -897,10 +935,22 @@ namespace DnsPilot
                     return;
                 }
                 if (!IsEnabled()) return;
-                string text;
-                text = ProcessRunner.Run("schtasks.exe", "/query /tn " + TaskArg + " /xml").Output;
+                string text = ProcessRunner.Run("schtasks.exe", "/query /tn " + TaskArg + " /xml").Output;
                 if (text.IndexOf(SecurityElement.Escape(LaunchPath()), StringComparison.OrdinalIgnoreCase) >= 0 &&
                     text.IndexOf("--tray", StringComparison.OrdinalIgnoreCase) >= 0) return;
+
+                // Görev başka bir exe'yi gösteriyor. Yalnızca o exe artık yoksa (taşınmış, silinmiş, eski sürüm) bu kopyaya
+                // yönlendirilir. Var olan başka bir kurulumun görevi ele geçirilmez: önceden ikinci bir kopyayı (geliştirme,
+                // taşınabilir, test) bir kez açmak, Windows açılışında hep o kopyanın başlamasına yol açıyordu.
+                var m = System.Text.RegularExpressions.Regex.Match(text, "<Command>(.*?)</Command>");
+                string target = m.Success ? System.Net.WebUtility.HtmlDecode(m.Groups[1].Value.Trim().Trim('"')) : null;
+                if (!string.IsNullOrEmpty(target) && File.Exists(target) &&
+                    text.IndexOf("--tray", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    Diag.Log("başlangıç görevi başka bir kopyayı gösteriyor, dokunulmadı: " + target);
+                    return;
+                }
+                Diag.Log("başlangıç görevi bu kopyaya yönlendirildi (önceki hedef: " + (target ?? "?") + ")");
                 Enable();
             }
             catch (Exception) { }

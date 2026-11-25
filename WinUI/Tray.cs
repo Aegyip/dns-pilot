@@ -83,6 +83,11 @@ namespace DnsPilot
             string pendingDns = app.PendingDns;
             var strategy = s.Strategy;
 
+            if (!AppController.Elevated)
+            {
+                items.Add(new TrayMenuHost.Item { Text = "Yönetici olarak yeniden başlat", Glyph = "", Action = app.RestartElevated });
+                items.Add(new TrayMenuHost.Separator());
+            }
             string activity = app.Activity;
             if (activity != null)
                 items.Add(new TrayMenuHost.Item { Text = activity, Glyph = "", Enabled = false });

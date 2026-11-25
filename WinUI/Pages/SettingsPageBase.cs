@@ -108,6 +108,18 @@ namespace DnsPilot.Pages
         // Önceden iş sürerken düğmeler sessizce soluklaşıyor, kullanıcı uygulamanın donduğunu sanıyordu.
         void ActivityBar(StackPanel s)
         {
+            if (!AppController.Elevated)
+                s.Children.Add(new InfoBar
+                {
+                    IsOpen = true,
+                    IsClosable = false,
+                    Severity = InfoBarSeverity.Warning,
+                    Title = "Yönetici izni yok",
+                    Message = "DNS Pilot yönetici izniyle çalışmıyor; DNS ayarları değiştirilemez ve Zapret başlatılamaz.",
+                    ActionButton = Btn("Yönetici olarak yeniden başlat", App.RestartElevated),
+                    Margin = new Thickness(0, 0, 0, 8),
+                });
+
             string activity = App.Activity;
             if (activity == null) return;
             s.Children.Add(new Border
@@ -205,6 +217,7 @@ namespace DnsPilot.Pages
         {
             string error = App.ZapretError;
             if (error == null) return;
+            if (error == DnsDegistirici.Zapret.ElevationMessage && !AppController.Elevated) return; // üstteki uyarı şeridi anlatıyor
             var bar = new InfoBar
             {
                 IsOpen = true,

@@ -298,10 +298,29 @@ dns.quad9.net
             return running.Count > 0;
         }
 
+        public const string ElevationMessage =
+            "Zapret yönetici izni gerektirir, ancak DNS Pilot yönetici izniyle çalışmıyor. " +
+            "\"Yönetici olarak yeniden başlat\" düğmesini kullanın ya da uygulamayı kapatıp yeniden açın ve izin isteğine \"Evet\" deyin.";
+
+        // Uygulama yönetici izniyle mi çalışıyor? Zapret (WinDivert sürücüsü) ve DNS değişiklikleri (netsh) bunu gerektirir.
+        public static bool IsElevated
+        {
+            get
+            {
+                try
+                {
+                    using (var id = System.Security.Principal.WindowsIdentity.GetCurrent())
+                        return new System.Security.Principal.WindowsPrincipal(id).IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
+                }
+                catch (Exception) { return true; }
+            }
+        }
+
         // Hata yoksa null, varsa hata metni döner.
         public static string Start(ZapretStrategy s, string filter)
         {
             if (!Installed) return "Zapret dosyaları bulunamadı. " + AntivirusHint + EngineDir;
+            if (!IsElevated) return ElevationMessage;
             Stop();
             RemoveForeignDriver();
             EnsureUserFiles();
@@ -353,7 +372,12 @@ dns.quad9.net
             p.StartInfo = psi;
             p.OutputDataReceived += Collect;
             p.ErrorDataReceived += Collect;
-            p.Start();
+            try { p.Start(); }
+            catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 740 || ex.NativeErrorCode == 5)
+            {
+                // 740 = ERROR_ELEVATION_REQUIRED, 5 = erişim engellendi: WinDivert sürücüsü yönetici izni ister.
+                return ElevationMessage;
+            }
             // DNS Pilot kapanır ya da çökerse winws de kapansın; önceden arkada sahipsiz kalıp trafiği işlemeye devam ediyordu.
             ChildJob.Assign(p);
             p.BeginOutputReadLine();

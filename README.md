@@ -89,7 +89,8 @@ dotnet build WinUI\DnsPilot.WinUI.csproj -c Debug -p:Platform=x64
 ### Sorun olursa
 - İnternet kesilirse menüden **Otomatik (modem / ISS)** seçin.
 - Bir site bozulursa **Zapret'i durdurun** ya da başka bir strateji deneyin.
-- Uygulamadan çıkıldığında Zapret de kapanır.
+- Uygulamadan çıkıldığında Zapret de kapanır; Zapret'in açılırken yaptığı DNS değişikliği geri alınır.
+- Sorunu bildirirken **Ayarlar → Sistem → Tanılama bilgilerini kopyala** ile alınan metni bildirime ekleyin. Kayıt dosyası: `%TEMP%\DnsPilot-kayit.txt`.
 
 <details>
 <summary><b>🛠️ Geliştirme</b></summary>
@@ -98,7 +99,6 @@ dotnet build WinUI\DnsPilot.WinUI.csproj -c Debug -p:Platform=x64
 |---|---|
 | `dotnet build WinUI\DnsPilot.WinUI.csproj -c Debug -p:Platform=x64` | `bin\winui\DnsPilot.exe` (geliştirme; veri dosyaları üstteki `bin\`'de aranır) |
 | `powershell -ExecutionPolicy Bypass -File WinUI\publish.ps1` | `dist\winui-publish\` (.NET ve Windows App SDK gömülü dağıtım klasörü) |
-| `powershell -ExecutionPolicy Bypass -File build.ps1` | `bin\classic\DnsPilot.exe` (eski WinForms sürümü, 1.x) |
 | `powershell -ExecutionPolicy Bypass -File installer\build-setup.ps1` | `dist\DNSPilot-Setup-<sürüm>.exe` (sessiz kurulum `/S`, kaldırma `/uninstall /S`) |
 | `powershell -ExecutionPolicy Bypass -File msix\build-msix.ps1 -Tools <SDK x64> -Engine bin\zapret\motor` | `dist\DNSPilot.msix` (Microsoft Store paketi; `-Out` ile ad verilebilir) |
 
@@ -113,12 +113,12 @@ WinUI/          Uygulama arayüzü (WinUI 3, .NET 8): pencere, sayfalar, tepsi m
   AppController.cs İşler: DNS, Zapret, strateji testi, güncellemeler, otomatik başlatma
   Pages/          Giriş, DNS, Zapret, Sistem, Güncellemeler (Windows Ayarlar kartları)
   TrayMenuHost.cs Windows 11 tarzı tepsi menüsü (akrilik)
-src/            Paylaşılan mantık + eski WinForms arayüzü (.NET Framework 4.8)
-  Tray.cs         Bildirim alanı, menü, güncellemeler, otomatik başlatma
-  SettingsForm.cs Windows 11 tarzı Ayarlar penceresi
+src/            Paylaşılan mantık (DNS, Zapret, ayarlar, tanılama)
   Dns.cs          DNS ve DoH ayarları, hız testi
   Zapret.cs       Zapret motoru ve ayar dosyaları
   StrategyTest.cs En uygun stratejiyi ölçme
+  ProcessRunner.cs Zaman sınırlı dış komutlar (netsh, schtasks, sc)
+  Diag.cs         Tanılama kaydı
   icon/           Logo kaynakları ve app.ico üretimi
 installer/      Klasik kurulum (setup.exe)
 msix/           Microsoft Store paketi (AppxManifest, paketleme betiği)

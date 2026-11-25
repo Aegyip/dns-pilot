@@ -45,18 +45,28 @@ namespace DnsPilot.Pages
 
         protected abstract void Build(StackPanel s);
 
+        // Açık bir açılır liste varken sayfa yeniden kurulmaz (liste kapanıp seçim kaybolurdu); kapanınca kurulur.
+        readonly System.Collections.Generic.List<ComboBox> combos = new System.Collections.Generic.List<ComboBox>();
+        bool rebuildPending;
+
         protected void Rebuild()
         {
+            foreach (var c in combos)
+                if (c.IsDropDownOpen) { rebuildPending = true; return; }
+            rebuildPending = false;
+            combos.Clear();
+
             double offset = scroll.VerticalOffset;
             stack.Children.Clear();
             try
             {
+                ActivityBar(stack);
                 Build(stack);
             }
             catch (Exception ex)
             {
                 // Sayfa kurulurken beklenmeyen hata uygulamayı kapatmasın; sayfada gösterilsin.
-                Trace.Log("Sayfa yüklenemedi (" + GetType().Name + "): " + ex);
+                DnsDegistirici.Diag.Log("Sayfa yüklenemedi (" + GetType().Name + "): " + ex);
                 stack.Children.Add(new InfoBar
                 {
                     IsOpen = true, IsClosable = false, Severity = InfoBarSeverity.Error,
@@ -94,19 +104,74 @@ namespace DnsPilot.Pages
             });
         }
 
+        // Çalışan/sıradaki iş: sayfanın üstünde ilerleme çubuğu ve adım ("Zapret başlatılıyor: şifreli DNS sunucusu aranıyor…").
+        // Önceden iş sürerken düğmeler sessizce soluklaşıyor, kullanıcı uygulamanın donduğunu sanıyordu.
+        void ActivityBar(StackPanel s)
+        {
+            string activity = App.Activity;
+            if (activity == null) return;
+            s.Children.Add(new Border
+            {
+                Padding = new Thickness(16, 12, 16, 12),
+                Margin = new Thickness(0, 0, 0, 8),
+                CornerRadius = new CornerRadius(8),
+                Background = (Brush)Application.Current.Resources["CardBackgroundFillColorDefaultBrush"],
+                BorderBrush = (Brush)Application.Current.Resources["CardStrokeColorDefaultBrush"],
+                BorderThickness = new Thickness(1),
+                Child = new StackPanel
+                {
+                    Spacing = 8,
+                    Children =
+                    {
+                        new TextBlock { Text = activity, TextWrapping = TextWrapping.Wrap },
+                        new ProgressBar { IsIndeterminate = true },
+                    }
+                },
+            });
+        }
+
+        // Tıklama işleyicilerindeki hata uygulamayı kapatmaz; kayda geçer.
+        protected static void Safe(Action action, string what)
+        {
+            try { action(); }
+            catch (Exception ex) { DnsDegistirici.Diag.Error(what, ex); }
+        }
+
         protected static Button Btn(string text, Action onClick, bool enabled = true, bool accent = false)
         {
             var b = new Button { Content = text, IsEnabled = enabled, MinWidth = 120 };
             if (accent) b.Style = (Style)Application.Current.Resources["AccentButtonStyle"];
-            b.Click += (s, e) => onClick();
+            b.Click += (s, e) => Safe(onClick, "düğme: " + text);
             return b;
         }
 
         protected static ToggleSwitch Toggle(bool on, Action<bool> changed, bool enabled = true)
         {
             var t = new ToggleSwitch { IsOn = on, IsEnabled = enabled };
-            t.Toggled += (s, e) => changed(t.IsOn);
+            t.Toggled += (s, e) => Safe(() => changed(t.IsOn), "anahtar");
             return t;
+        }
+
+        // Açılır liste: (değer, görünen metin) çiftleri; seçim değişince onChange(değer).
+        protected ComboBox Combo(System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string, string>> options,
+                                 string value, Action<string> onChange, bool enabled = true, double width = 260)
+        {
+            var box = new ComboBox { MinWidth = width, IsEnabled = enabled };
+            var keys = new System.Collections.Generic.List<string>();
+            foreach (var o in options)
+            {
+                keys.Add(o.Key);
+                box.Items.Add(new ComboBoxItem { Content = o.Value, Tag = o.Key });
+            }
+            box.SelectedIndex = Math.Max(0, keys.IndexOf(value));
+            box.SelectionChanged += (s, e) =>
+            {
+                var item = box.SelectedItem as ComboBoxItem;
+                if (item != null) Safe(() => onChange((string)item.Tag), "seçim");
+            };
+            box.DropDownClosed += (s, e) => { if (rebuildPending) DispatcherQueue.TryEnqueue(Rebuild); };
+            combos.Add(box);
+            return box;
         }
 
         protected static TextBlock Badge(string text, bool success)
@@ -127,9 +192,9 @@ namespace DnsPilot.Pages
                     Children = { new ProgressRing { IsActive = true, Width = 20, Height = 20 }, new TextBlock { Text = "Yükleniyor…", VerticalAlignment = VerticalAlignment.Center } }
                 };
             else
-                action = Btn("Motoru yükle", App.InstallEngine, !App.Busy, true);
+                action = Btn("Motoru yükle", App.InstallEngine, true, true);
             return Card("\uEA18", "Zapret",
-                DnsDegistirici.Zapret.EngineRemoved
+                App.State.EngineRemoved
                     ? "Zapret dosyaları silinmiş. Bu genellikle antivirüsün winws2.exe / WinDivert dosyalarını karantinaya almasıyla olur. " +
                       "Antivirüste şu klasörü istisnalara ekleyip motoru yeniden yükleyin: " + DnsDegistirici.Zapret.EngineDir
                     : "Zapret motoru henüz yüklü değil. Erişim kısıtlamalarını aşabilmek için motoru yükleyin; birkaç saniye sürer.", action);
@@ -154,7 +219,7 @@ namespace DnsPilot.Pages
         }
         protected static void OpenInNotepad(string path)
         {
-            Process.Start(new ProcessStartInfo("notepad.exe", "\"" + path + "\"") { UseShellExecute = false });
+            Safe(() => Process.Start(new ProcessStartInfo("notepad.exe", "\"" + path + "\"") { UseShellExecute = false }), "not defteri");
         }
 
         protected static void OpenUri(string uri)

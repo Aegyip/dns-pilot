@@ -10,39 +10,22 @@ namespace DnsPilot.Pages
     {
         public ZapretPage() : base("Zapret") { }
 
-        // Açılır liste: (değer, görünen metin) çiftleri; seçim değişince onChange(değer).
-        static ComboBox Combo(IEnumerable<KeyValuePair<string, string>> options, string value, Action<string> onChange, bool enabled = true, double width = 260)
-        {
-            var box = new ComboBox { MinWidth = width, IsEnabled = enabled };
-            var keys = new List<string>();
-            foreach (var o in options)
-            {
-                keys.Add(o.Key);
-                box.Items.Add(new ComboBoxItem { Content = o.Value, Tag = o.Key });
-            }
-            box.SelectedIndex = Math.Max(0, keys.IndexOf(value));
-            box.SelectionChanged += (s, e) =>
-            {
-                var item = box.SelectedItem as ComboBoxItem;
-                if (item != null) onChange((string)item.Tag);
-            };
-            return box;
-        }
-
         protected override void Build(StackPanel s)
         {
-            bool on = Zapret.IsRunning();
-            var strategies = Zapret.LoadStrategies();
+            var snap = App.State;
+            bool on = App.PendingZapret ?? snap.ZapretRunning;
+            bool installed = snap.ZapretInstalled;
+            var strategies = snap.Strategies;
             var strategy = AppController.CurrentStrategy(strategies);
 
-            if (!Zapret.Installed && !Settings.Packaged)
+            if (!installed && !Settings.Packaged)
                 s.Children.Add(EngineMissingCard());
             else
                 s.Children.Add(Card("\uEA18", "Zapret",
-                    Zapret.Installed
+                    installed
                         ? "Derin paket incelemesi (DPI) yoluyla uygulanan erişim kısıtlamalarını aşar. Discord gibi yalnızca DNS değişikliğiyle açılamayan hizmetler için gereklidir."
                         : "Zapret motoru bulunamadı.",
-                    Toggle(on, v => { if (v) App.StartZapret(); else App.StopZapret(); }, !App.Busy && Zapret.Installed)));
+                    Toggle(on, v => { if (v) App.StartZapret(); else App.StopZapret(); }, installed)));
             ZapretErrorBar(s);
 
             Section(s, "Yapılandırma");
@@ -53,7 +36,7 @@ namespace DnsPilot.Pages
 
             var findCard = Card("", "En uygun stratejiyi bul",
                 App.StrategyTestStatus ?? "Tüm stratejileri bağlantınız üzerinde sırayla dener ve kısıtlanan hizmetlere en hızlı erişimi sağlayanı otomatik olarak seçer. İşlem yaklaşık bir dakika sürer.",
-                testing ? (object)Btn("Durdur", App.FindStrategy) : Btn("Bul", App.FindStrategy, !App.Busy && Zapret.Installed, true));
+                testing ? (object)Btn("Durdur", App.FindStrategy) : Btn("Bul", App.FindStrategy, installed, true));
             if (testing)
             {
                 // Windows Ayarlar'daki gibi kartın altında belirsiz ilerleme çubuğu.
@@ -82,8 +65,8 @@ namespace DnsPilot.Pages
                 Combo(strategyOptions, strategy != null ? strategy.Name : null, v =>
                 {
                     Settings.Set("zapret.strateji", v);
-                    if (Zapret.IsRunning()) App.StartZapret();
-                }, !App.Busy, 280)));
+                    App.ZapretSettingsChanged();
+                }, true, 280)));
 
             s.Children.Add(Card("", "Uygulanacak siteler",
                 "Önerilen ayar, yalnızca listedeki sitelerdir. Otomatik algılama, erişilemeyen siteleri kendiliğinden listeye ekler.",
@@ -95,8 +78,8 @@ namespace DnsPilot.Pages
                 }, Settings.Get("zapret.filtre", Zapret.FilterList), v =>
                 {
                     Settings.Set("zapret.filtre", v);
-                    if (Zapret.IsRunning()) App.StartZapret();
-                }, !App.Busy)));
+                    App.ZapretSettingsChanged();
+                })));
 
             Section(s, "Başlangıç ve DNS");
             s.Children.Add(Card("", "Uygulama açıldığında başlat",
@@ -108,8 +91,8 @@ namespace DnsPilot.Pages
                 "Bazı servis sağlayıcılar kısıtlı sitelerin şifresiz DNS sorgularını yanıtlamaz. Bu seçenek, Zapret başlarken şifreli DNS'i etkinleştirir.",
                 Toggle(autoDns, v => { Settings.Set("zapret.sifreli_dns", v ? "1" : "0"); Rebuild(); })));
 
-            var dohProfiles = ProfileStore.Load().Where(p => p.Doh != null).ToList();
-            string preferred = Settings.Get("zapret.dns", "AdGuard");
+            var dohProfiles = snap.Profiles.Where(p => p.Doh != null).ToList();
+            string preferred = Settings.Get("zapret.dns", "Cloudflare");
             var match = dohProfiles.FirstOrDefault(p => p.Name.StartsWith(preferred, StringComparison.OrdinalIgnoreCase));
             s.Children.Add(Card("", "Tercih edilen şifreli DNS",
                 "Seçilen sunucuya ulaşılamazsa sıradaki şifreli sunucu kullanılır.",

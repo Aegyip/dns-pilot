@@ -9,7 +9,19 @@ namespace DnsPilot.Pages
     // DNS hız testi: WinUI iletişim kutusunda, sunucu başına çubuk göstergeli sonuçlar.
     public static class SpeedTestDialog
     {
+        static bool open;
+
+        // Aynı anda yalnızca bir ContentDialog açılabilir; ikinci tıklama önceden uygulamayı çökertiyordu.
         public static async void Show(XamlRoot root)
+        {
+            if (open || root == null) return;
+            open = true;
+            try { await ShowCore(root); }
+            catch (Exception ex) { DnsDegistirici.Diag.Error("hız testi", ex); }
+            finally { open = false; }
+        }
+
+        static async System.Threading.Tasks.Task ShowCore(XamlRoot root)
         {
             var body = new StackPanel { Spacing = 12, MinWidth = 420 };
             body.Children.Add(new ProgressRing { IsActive = true, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 24, 0, 24) });

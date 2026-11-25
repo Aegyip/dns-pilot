@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
     DNS Pilot — WinUI 3 (Windows App SDK) arayüzü.
-    DNS, Zapret, strateji testi ve güncelleme mantığı ..\src altındaki dosyalardan bağlanır (link);
-    WinForms sürümüyle aynı kodu paylaşır. Çıktı bin\winui\ klasörüne gider; zapret motoru ve kullanıcı
+    DNS, Zapret, strateji testi ve güncelleme mantığı ..\src altındaki dosyalardan bağlanır (link).
+    Çıktı bin\winui\ klasörüne gider; zapret motoru ve kullanıcı
     dosyaları bir üstteki bin\ klasöründe aranır (src\Zapret.cs: Settings.ResolveInstallDir).
   -->
   <PropertyGroup>
@@ -14,7 +14,7 @@
     <AssemblyName>DnsPilot</AssemblyName>
     <AssemblyTitle>DNS Pilot</AssemblyTitle>
     <Product>DNS Pilot</Product>
-    <Version>2.0.2</Version>
+    <Version>2.1.0</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>..\src\app.ico</ApplicationIcon>
     <Platforms>x64</Platforms>
@@ -29,8 +29,8 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
     <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
-    <!-- WebClient / ServicePointManager eski API uyarıları (paylaşılan kod .NET Framework ile de derleniyor) -->
-    <NoWarn>$(NoWarn);SYSLIB0014;CA1416</NoWarn>
+    <!-- Uygulama yalnızca Windows'ta çalışır; platform uyumluluğu uyarıları gereksiz. -->
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
     <OutputPath Condition="'$(Configuration)' == 'Debug'">..\bin\winui\</OutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
@@ -44,6 +44,9 @@
     <Compile Include="..\src\Updates.cs" Link="Shared\Updates.cs" />
     <Compile Include="..\src\Shortcut.cs" Link="Shared\Shortcut.cs" />
     <Compile Include="..\src\BugReport.cs" Link="Shared\BugReport.cs" />
+    <Compile Include="..\src\Diag.cs" Link="Shared\Diag.cs" />
+    <Compile Include="..\src\ProcessRunner.cs" Link="Shared\ProcessRunner.cs" />
+    <Compile Include="..\src\ChildJob.cs" Link="Shared\ChildJob.cs" />
   </ItemGroup>
 
   <ItemGroup>

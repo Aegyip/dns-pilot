@@ -57,6 +57,12 @@ body:
       description: Strateji sorunlarında yardımcı olur.
       placeholder: Örn. Türk Telekom, Superonline, Vodafone
   - type: textarea
+    id: tanilama
+    attributes:
+      label: Tanılama bilgileri
+      description: Uygulamada Ayarlar → Sistem → "Tanılama bilgilerini kopyala" düğmesine basıp buraya yapıştırın (Ctrl+V). Kullanıcı adı ve klasör yolları çıkarılmıştır.
+      render: text
+  - type: textarea
     id: ekler
     attributes:
       label: Ekran görüntüsü veya ek bilgi

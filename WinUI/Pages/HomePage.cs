@@ -18,24 +18,26 @@ namespace DnsPilot.Pages
 
         protected override void Build(StackPanel s)
         {
-            var profiles = ProfileStore.Load();
-            var state = DnsManager.GetState(profiles);
-            bool zapretOn = Zapret.IsRunning();
-            var strategy = AppController.CurrentStrategy(Zapret.LoadStrategies());
+            var snap = App.State;
+            var state = snap.Dns;
+            bool zapretOn = snap.ZapretRunning;
+            bool zapretTarget = App.PendingZapret ?? zapretOn;
+            var strategy = snap.Strategy;
 
             string servers = state.Servers.Count == 0 ? "—" : string.Join(", ", state.Servers.Take(4));
-            s.Children.Add(Card("", StatusText(state),
+            s.Children.Add(Card("\uE774", StatusText(state),
                 state.HasAdapter ? state.AdapterName + " bağlantısı · Sunucular: " + servers : "Etkin bir ağ bağlantısı algılanmadı.",
                 Btn("Değiştir", () => DnsPilot.App.Instance.ShowWindow("DNS"))));
 
-            if (!Zapret.Installed && !Settings.Packaged)
+            if (!snap.ZapretInstalled && !Settings.Packaged)
                 s.Children.Add(EngineMissingCard());
             else
-                s.Children.Add(Card("\uEA18", "Zapret",
-                    !Zapret.Installed ? "Zapret motoru bulunamadı."
+                s.Children.Add(Card("", "Zapret",
+                    !snap.ZapretInstalled ? "Zapret motoru bulunamadı."
+                    : zapretTarget != zapretOn ? (zapretTarget ? "Başlatılıyor…" : "Durduruluyor…")
                     : zapretOn ? "Etkin · " + (strategy != null ? strategy.Name : "Varsayılan") + " stratejisi kullanılıyor"
                     : "Devre dışı · Erişim kısıtlamalarını aşmak için etkinleştirin",
-                    Toggle(zapretOn, on => { if (on) App.StartZapret(); else App.StopZapret(); }, !App.Busy && Zapret.Installed)));
+                    Toggle(zapretTarget, on => { if (on) App.StartZapret(); else App.StopZapret(); }, snap.ZapretInstalled)));
             ZapretErrorBar(s);
 
             var u = App.Updates;
@@ -55,11 +57,11 @@ namespace DnsPilot.Pages
             }
 
             Section(s, "Araçlar");
-            s.Children.Add(Link("", "DNS hız testi", "Kayıtlı DNS sunucularının yanıt sürelerini ölçer ve karşılaştırır.",
+            s.Children.Add(Link("\uE916", "DNS hız testi", "Kayıtlı DNS sunucularının yanıt sürelerini ölçer ve karşılaştırır.",
                 () => SpeedTestDialog.Show(XamlRoot)));
-            s.Children.Add(Card("", "DNS önbelleğini temizle",
+            s.Children.Add(Card("\uE894", "DNS önbelleğini temizle",
                 "Bir site açılmıyorsa veya eski bir adrese yönleniyorsa, kayıtlı DNS yanıtlarını temizleyerek sorunu giderir.",
-                Btn("Temizle", App.FlushCache, !App.Busy)));
+                Btn("Temizle", App.FlushCache)));
         }
     }
 }

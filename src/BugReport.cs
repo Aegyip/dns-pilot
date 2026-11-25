@@ -48,7 +48,7 @@ namespace DnsDegistirici
             return typeof(BugReport).Assembly.GetName().Version.ToString(3);
         }
 
-        static string WindowsVersion()
+        public static string WindowsVersion()
         {
             try
             {

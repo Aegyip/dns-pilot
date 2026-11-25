@@ -58,7 +58,7 @@ namespace DnsPilot.Pages
                     Btn("Store'u aç", () => OpenUri("ms-windows-store://downloadsandupdates"), true, true)));
                 Section(s, "Bileşenler");
                 s.Children.Add(Card("", "DNS Pilot", "Sürüm " + AppVersion));
-                s.Children.Add(Card("", "Zapret motoru", "Sürüm " + AppController.ShortSha(Zapret.CurrentVersion()) +
+                s.Children.Add(Card("", "Zapret motoru", "Sürüm " + AppController.ShortSha(App.State.ZapretVersion) +
                     " · Kaynak: bol-van/zapret-win-bundle · Uygulamayla birlikte gelir"));
                 return;
             }
@@ -72,7 +72,7 @@ namespace DnsPilot.Pages
             else if (u.Checking)
                 s.Children.Add(Hero("", false, "Güncellemeler denetleniyor…", "Bu işlem birkaç saniye sürebilir.", null, true));
             else if (u.ZapretAvailable)
-                s.Children.Add(Hero("", false, "Güncellemeler kullanılabilir", last, Btn("Şimdi yükle", App.InstallUpdates, !App.Busy, true)));
+                s.Children.Add(Hero("", false, "Güncellemeler kullanılabilir", last, Btn("Şimdi yükle", App.InstallUpdates, !u.Installing, true)));
             else if (u.LastCheck.HasValue && u.Error == null)
                 s.Children.Add(Hero("", true, "Güncelsiniz", last, Btn("Güncellemeleri denetle", App.CheckUpdates, true, true)));
             else

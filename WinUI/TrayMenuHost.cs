@@ -19,6 +19,7 @@ namespace DnsPilot
     {
         [DllImport("user32.dll")] static extern bool GetCursorPos(out POINT p);
         [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr hwnd);
+        [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
         [DllImport("user32.dll")] static extern int GetWindowLong(IntPtr hwnd, int index);
         [DllImport("user32.dll")] static extern int SetWindowLong(IntPtr hwnd, int index, int value);
         [DllImport("user32.dll")] static extern uint GetDpiForWindow(IntPtr hwnd);
@@ -121,7 +122,8 @@ namespace DnsPilot
                 grid.PointerReleased += (s, e) =>
                 {
                     Hide();
-                    item.Action();
+                    try { item.Action(); }
+                    catch (Exception ex) { DnsDegistirici.Diag.Error("tepsi menüsü: " + item.Text, ex); }
                 };
             }
             return grid;
@@ -163,8 +165,17 @@ namespace DnsPilot
 
             window.AppWindow.Show();
             window.Activate();
-            SetForegroundWindow(hwnd);
             shown = true;
+            // Odak alınamazsa (ör. tam ekran bir uygulama önde) menü "etkinliğini kaybetme" olayını hiç almaz ve ekranın
+            // üstünde asılı kalırdı; o durumda hemen kapatılır.
+            if (!SetForegroundWindow(hwnd) && GetForegroundWindow() != hwnd)
+            {
+                var timer = window.DispatcherQueue.CreateTimer();
+                timer.Interval = TimeSpan.FromMilliseconds(400);
+                timer.IsRepeating = false;
+                timer.Tick += (s, e) => { if (shown && GetForegroundWindow() != hwnd) Hide(); };
+                timer.Start();
+            }
         }
     }
 }

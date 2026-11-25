@@ -38,27 +38,59 @@ namespace DnsPilot
             };
             // Sağ tık: Windows 11 tepsi menüleri gibi WinUI menüsü (TrayMenuHost). Kütüphanenin kendi
             // "ikinci pencere" kipi menüyü göstermiyor, yerel Win32 menüsü de eski görünüyordu.
-            icon.RightClickCommand = new Command(() => App.UI.TryEnqueue(() => menuHost.Show(BuildMenu())));
+            icon.RightClickCommand = new Command(() => App.UI.TryEnqueue(() =>
+            {
+                try { menuHost.Show(BuildMenu()); } catch (Exception ex) { Diag.Error("tepsi menüsü", ex); }
+            }));
             app.StateChanged += RefreshIcon;
             RefreshIcon();
-            icon.ForceCreate(false); // verimlilik kipi kapalı: zapret/DNS işleri yavaşlatılmasın
+            Create();
         }
+
+        // Oturum açılışında Explorer henüz hazır değilse simge oluşturulamaz (kütüphane "TryCreate failed" fırlatır).
+        // Önceden bu, uygulamayı açılışta çökertiyordu; şimdi bir dakika boyunca birkaç saniyede bir yeniden denenir.
+        void Create()
+        {
+            try
+            {
+                icon.ForceCreate(false); // verimlilik kipi kapalı: zapret/DNS işleri yavaşlatılmasın
+                created = true;
+                RefreshIcon();
+            }
+            catch (Exception ex)
+            {
+                if (++createAttempts == 1) Diag.Error("tepsi simgesi oluşturulamadı, yeniden denenecek", ex);
+                if (createAttempts > 20) return;
+                var timer = App.UI.CreateTimer();
+                timer.Interval = TimeSpan.FromSeconds(3);
+                timer.IsRepeating = false;
+                timer.Tick += (s, e) => Create();
+                timer.Start();
+            }
+        }
+
+        bool created;
+        int createAttempts;
 
         // ---- Menü: yalnızca sık kullanılanlar, geri kalanı Ayarlar penceresinde ----
 
         List<TrayMenuHost.Entry> BuildMenu()
         {
             var items = new List<TrayMenuHost.Entry>();
-            var profiles = ProfileStore.Load();
-            var state = DnsManager.GetState(profiles);
-            bool zapretOn = Zapret.IsRunning();
-            var strategy = AppController.CurrentStrategy(Zapret.LoadStrategies());
+            var s = app.State;
+            var state = s.Dns;
+            bool zapretOn = app.PendingZapret ?? s.ZapretRunning;
+            string pendingDns = app.PendingDns;
+            var strategy = s.Strategy;
 
-            items.Add(new TrayMenuHost.Item { Text = state.Summary, Glyph = "\uE774", Enabled = false });
+            string activity = app.Activity;
+            if (activity != null)
+                items.Add(new TrayMenuHost.Item { Text = activity, Glyph = "", Enabled = false });
+            items.Add(new TrayMenuHost.Item { Text = state.Summary, Glyph = "", Enabled = false });
             items.Add(new TrayMenuHost.Item
             {
-                Text = zapretOn ? "Zapret: etkin · " + (strategy != null ? strategy.Name : "?") : "Zapret: devre dışı",
-                Glyph = "\uEA18",
+                Text = s.ZapretRunning ? "Zapret: etkin · " + (strategy != null ? strategy.Name : "?") : "Zapret: devre dışı",
+                Glyph = "",
                 Enabled = false
             });
             items.Add(new TrayMenuHost.Separator());
@@ -66,28 +98,26 @@ namespace DnsPilot
             items.Add(new TrayMenuHost.Item
             {
                 Text = zapretOn ? "Zapret'i durdur" : "Zapret'i başlat",
-                Glyph = zapretOn ? "\uE71A" : "\uE768",
-                Enabled = !app.Busy && Zapret.Installed,
+                Glyph = zapretOn ? "" : "",
+                Enabled = s.ZapretInstalled,
                 Action = () => { if (zapretOn) app.StopZapret(); else app.StartZapret(); }
             });
             items.Add(new TrayMenuHost.Separator());
 
-            foreach (var p in profiles)
+            foreach (var p in s.Profiles)
             {
                 var profile = p;
                 items.Add(new TrayMenuHost.Item
                 {
                     Text = p.Name,
-                    Checked = state.IsStatic && state.Matched == p.Name,
-                    Enabled = !app.Busy,
+                    Checked = pendingDns != null ? pendingDns == p.Name : state.IsStatic && state.Matched == p.Name,
                     Action = () => app.ApplyProfile(profile)
                 });
             }
             items.Add(new TrayMenuHost.Item
             {
                 Text = "Otomatik",
-                Checked = state.HasAdapter && !state.IsStatic,
-                Enabled = !app.Busy,
+                Checked = pendingDns != null ? pendingDns == "" : state.HasAdapter && !state.IsStatic,
                 Action = app.ResetDns
             });
 
@@ -100,16 +130,42 @@ namespace DnsPilot
         }
         // ---- Simge: logo + sağ altta durum noktası ----
 
+        Color? lastDot;
+        string lastTip;
+
+        // Durum anlık görüntüsünden çizilir (arayüz iş parçacığında tarama yok). Renk ve ipucu değişmediyse kabuğa
+        // hiç gidilmez; Explorer meşgulken her durum değişikliğinde Shell_NotifyIcon beklemek arayüzü takıyordu.
         void RefreshIcon()
         {
-            var state = DnsManager.GetState(ProfileStore.Load());
-            bool zapretOn = Zapret.IsRunning();
-            Color color = !state.HasAdapter ? Color.FromArgb(220, 38, 38)   // kırmızı: bağlantı yok
-                        : !state.IsStatic   ? Color.FromArgb(115, 115, 115) // gri: servis sağlayıcı DNS'i
-                        : state.DohOn       ? Color.FromArgb(22, 163, 74)   // yeşil: şifreli
-                        :                     Color.FromArgb(139, 92, 246); // mor: şifresiz özel
-            Color dot = zapretOn && state.HasAdapter ? Color.FromArgb(245, 158, 11) : color;
+            try
+            {
+                var s = app.State;
+                var state = s.Dns;
+                bool zapretOn = s.ZapretRunning;
+                Color color = !state.HasAdapter ? Color.FromArgb(220, 38, 38)   // kırmızı: bağlantı yok
+                            : !state.IsStatic   ? Color.FromArgb(115, 115, 115) // gri: servis sağlayıcı DNS'i
+                            : state.DohOn       ? Color.FromArgb(22, 163, 74)   // yeşil: şifreli
+                            :                     Color.FromArgb(139, 92, 246); // mor: şifresiz özel
+                Color dot = zapretOn && state.HasAdapter ? Color.FromArgb(245, 158, 11) : color;
+                if (lastDot != dot || currentHandle == IntPtr.Zero) DrawIcon(dot);
+                lastDot = dot;
 
+                string activity = app.Activity;
+                string tip = AppController.Clip(activity ?? state.Summary + (zapretOn ? " · Zapret" : ""), 63);
+                if (tip != lastTip) icon.ToolTipText = tip;
+                lastTip = tip;
+            }
+            catch (Exception ex)
+            {
+                // Kabuk o an yanıt vermiyorsa (Explorer yeniden başlıyor, oturum açılışı) bir sonraki değişiklikte yeniden denenir.
+                lastDot = null;
+                lastTip = null;
+                Diag.Log("tepsi simgesi güncellenemedi: " + ex.Message);
+            }
+        }
+
+        void DrawIcon(Color dot)
+        {
             int size = Math.Max(16, GetSystemMetrics(49)); // SM_CXSMICON: tepsinin gerçek boyutu
             using (var bmp = Logo(size))
             using (var g = Graphics.FromImage(bmp))
@@ -125,12 +181,12 @@ namespace DnsPilot
 
                 IntPtr handle = bmp.GetHicon();
                 var next = Icon.FromHandle(handle);
-                icon.Icon = next;
+                try { icon.Icon = next; }
+                catch (Exception) { DestroyIcon(handle); throw; }
                 if (currentHandle != IntPtr.Zero) DestroyIcon(currentHandle);
                 current = next;
                 currentHandle = handle;
             }
-            icon.ToolTipText = AppController.Clip(state.Summary + (zapretOn ? " · Zapret" : ""), 63);
         }
 
         static string IcoPath { get { return Path.Combine(AppContext.BaseDirectory, "Assets", "app.ico"); } }
@@ -159,6 +215,7 @@ namespace DnsPilot
         {
             try
             {
+                if (!created) return;
                 if (balloonLogo == null) balloonLogo = new Icon(IcoPath, 48, 48);
                 icon.ShowNotification(title, message, NotificationIcon.None, balloonLogo.Handle, largeIcon: true);
             }
@@ -178,7 +235,10 @@ namespace DnsPilot
             public Command(Action action) { this.action = action; }
             public event EventHandler CanExecuteChanged { add { } remove { } }
             public bool CanExecute(object parameter) { return true; }
-            public void Execute(object parameter) { action(); }
+            public void Execute(object parameter)
+            {
+                try { action(); } catch (Exception ex) { Diag.Error("tepsi", ex); }
+            }
         }
     }
 }

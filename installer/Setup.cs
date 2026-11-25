@@ -8,8 +8,8 @@ using Microsoft.Win32;
 
 [assembly: AssemblyTitle("DNS Pilot Kurulum")]
 [assembly: AssemblyProduct("DNS Pilot")]
-[assembly: AssemblyVersion("2.0.2.0")]
-[assembly: AssemblyFileVersion("2.0.2.0")]
+[assembly: AssemblyVersion("2.1.0.0")]
+[assembly: AssemblyFileVersion("2.1.0.0")]
 
 // DNS Pilot kurucusu. Uygulama (WinUI 3, .NET ve Windows App SDK dahil) bu dosyaya zip olarak gömülüdür.
 //   setup.exe                 → kurar (onay sorar, sonunda uygulamayı açar)
@@ -19,7 +19,7 @@ using Microsoft.Win32;
 static class Setup
 {
     const string AppName = "DNS Pilot";
-    const string Version = "2.0.2";
+    const string Version = "2.1.0";
     const string Publisher = "Ozan İnce";
     const string ExeName = "DnsPilot.exe";
     const string OldExeName = "DnsDegistirici.exe"; // 1.x (WinForms) sürümü
@@ -108,9 +108,14 @@ static class Setup
     static int Uninstall(bool silent)
     {
         if (!silent && MessageBox.Show(AppName + " kaldırılsın mı? Ayarlarınız ve DNS profilleriniz de silinecek.\n\n" +
-                "DNS ayarınız şu an özel bir sunucudaysa, kaldırmadan önce uygulamadan \"Otomatik (modem / ISS)\" seçmeniz önerilir.",
+                "DNS Pilot'un yaptığı DNS ayarı geri alınır (Zapret öncesi ayarınıza ya da otomatik ayara dönülür).",
                 AppName + " Kaldır", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
             return 1602;
+
+        // Uygulamanın kendisi, kaydettiği önceki DNS ayarını geri yükler (WinUI\Program.cs: --dns-sifirla).
+        // Önceden DNS "yalnızca şifreli" modda kalıyor, kaldırmadan sonra internet yavaş ya da kesik kalabiliyordu.
+        string appExe = Path.Combine(InstallDir, ExeName);
+        if (File.Exists(appExe)) Run(appExe, "--dns-sifirla", 60000);
 
         StopApp();
         Run("schtasks.exe", "/delete /tn " + TaskName + " /f");
@@ -177,12 +182,12 @@ static class Setup
             }
     }
 
-    static void Run(string file, string args)
+    static void Run(string file, string args, int timeoutMs = 15000)
     {
         try
         {
             var psi = new ProcessStartInfo(file, args) { CreateNoWindow = true, UseShellExecute = false };
-            using (var p = Process.Start(psi)) p.WaitForExit(15000);
+            using (var p = Process.Start(psi)) p.WaitForExit(timeoutMs);
         }
         catch (Exception) { }
     }

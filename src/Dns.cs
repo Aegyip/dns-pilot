@@ -94,12 +94,25 @@ AdGuard (reklam engelli) | 94.140.14.14, 94.140.15.15 | 2a10:50c0::ad1:ff, 2a10:
         // İnternete çıkan (ağ geçidi olan) fiziksel/sanal bağdaştırıcılar.
         public static List<NetworkInterface> ActiveAdapters()
         {
-            return NetworkInterface.GetAllNetworkInterfaces().Where(n =>
-                n.OperationalStatus == OperationalStatus.Up &&
-                n.NetworkInterfaceType != NetworkInterfaceType.Loopback &&
-                n.NetworkInterfaceType != NetworkInterfaceType.Tunnel &&
-                n.Supports(NetworkInterfaceComponent.IPv4) &&
-                n.GetIPProperties().GatewayAddresses.Count > 0).ToList();
+            var list = new List<NetworkInterface>();
+            NetworkInterface[] all;
+            try { all = NetworkInterface.GetAllNetworkInterfaces(); }
+            catch (Exception ex) { Diag.Error("ağ bağdaştırıcıları okunamadı", ex); return list; }
+            foreach (var n in all)
+            {
+                try
+                {
+                    // Bağdaştırıcı tam o sırada kaybolursa (Wi-Fi geçişi, VPN) özellik okumaları hata fırlatabilir.
+                    if (n.OperationalStatus == OperationalStatus.Up &&
+                        n.NetworkInterfaceType != NetworkInterfaceType.Loopback &&
+                        n.NetworkInterfaceType != NetworkInterfaceType.Tunnel &&
+                        n.Supports(NetworkInterfaceComponent.IPv4) &&
+                        n.GetIPProperties().GatewayAddresses.Count > 0)
+                        list.Add(n);
+                }
+                catch (Exception) { }
+            }
+            return list;
         }
 
         public static DnsState GetState(List<DnsProfile> profiles)
@@ -132,20 +145,32 @@ AdGuard (reklam engelli) | 94.140.14.14, 94.140.15.15 | 2a10:50c0::ad1:ff, 2a10:
         }
 
         // Hata yoksa null, varsa hata metni döner.
-        public static string Apply(DnsProfile p)
+        // Şifreli DNS kesilirse Windows şifresiz DNS'e dönebilsin mi? Varsayılan: evet. Kapalıyken ("yalnızca şifreli")
+        // servis sağlayıcı DoH'yi kestiği anda (ör. Zapret durunca) her ad çözümlemesi zaman aşımını bekler; internet
+        // çok yavaşlamış ya da kesilmiş gibi görünür.
+        public static bool UdpFallback
+        {
+            get { return Settings.Get("dns.udp_yedek", "1") == "1"; }
+        }
+
+        public static string Apply(DnsProfile p) { return Apply(p, null); }
+
+        // reachable: DoH erişimi az önce denendiyse sonucu (yeniden denenmesin); null ise burada denenir.
+        public static string Apply(DnsProfile p, bool? reachable)
         {
             var adapters = ActiveAdapters();
             if (adapters.Count == 0) return "Bağlı ağ bulunamadı.";
             var log = new StringBuilder();
+            bool fallback = UdpFallback;
 
             // "Yalnızca şifreli" modda DoH erişilemezse hiçbir ad çözülmez; bu yüzden önce deneriz.
-            bool useDoh = p.Doh != null && DohReachable(p);
+            bool useDoh = p.Doh != null && (reachable ?? DohReachable(p));
             if (p.Doh != null)
             {
                 foreach (var ip in p.V4.Concat(p.V6))
                 {
                     string args = " encryption server=" + ip + " dohtemplate=" + p.Doh +
-                                  (useDoh ? " autoupgrade=yes udpfallback=no" : " autoupgrade=no udpfallback=yes");
+                                  (useDoh ? " autoupgrade=yes udpfallback=" + (fallback ? "yes" : "no") : " autoupgrade=no udpfallback=yes");
                     if (Netsh("dns add" + args, null) != 0)
                         Netsh("dns set" + args, log);
                 }
@@ -159,8 +184,8 @@ AdGuard (reklam engelli) | 94.140.14.14, 94.140.15.15 | 2a10:50c0::ad1:ff, 2a10:
                 ClearDoh(n.Id);
                 if (useDoh)
                 {
-                    SetDoh(n.Id, "Doh", p.V4);
-                    SetDoh(n.Id, "Doh6", p.V6);
+                    SetDoh(n.Id, "Doh", p.V4, fallback);
+                    SetDoh(n.Id, "Doh6", p.V6, fallback);
                 }
 
                 SetServers("ipv4", props.GetIPv4Properties().Index, p.V4, log);
@@ -183,10 +208,40 @@ AdGuard (reklam engelli) | 94.140.14.14, 94.140.15.15 | 2a10:50c0::ad1:ff, 2a10:
         // Tercih edilen addaki profil önce denenir; ilk erişilebilen şifreli profil döner, yoksa null.
         public static DnsProfile PickEncrypted(List<DnsProfile> profiles, string preferred)
         {
-            return profiles
-                .Where(p => p.Doh != null)
+            // Sunucular aynı anda denenir: sırayla denemek, DoH'nin engellendiği bir ağda 4 × 6 sn bekletiyordu.
+            var candidates = profiles.Where(p => p.Doh != null)
                 .OrderBy(p => p.Name.StartsWith(preferred, StringComparison.OrdinalIgnoreCase) ? 0 : 1)
-                .FirstOrDefault(DohReachable);
+                .ToList();
+            var tasks = candidates.Select(p => System.Threading.Tasks.Task.Run(() => DohReachable(p))).ToArray();
+            try { System.Threading.Tasks.Task.WaitAll(tasks, 10000); } catch (Exception) { }
+            for (int i = 0; i < candidates.Count; i++)
+                if (tasks[i].IsCompletedSuccessfully && tasks[i].Result) return candidates[i];
+            return null;
+        }
+
+        // Geçerli DNS ayarını geri yüklenebilir biçimde anlatır: "dhcp" ya da "v4 adresleri;v6 adresleri".
+        public static string Describe()
+        {
+            var adapters = ActiveAdapters();
+            if (adapters.Count == 0) return null;
+            var n = adapters[0];
+            if (!IsStatic(n.Id)) return "dhcp";
+            var servers = n.GetIPProperties().DnsAddresses.Select(a => a.ToString()).ToList();
+            return string.Join(",", servers.Where(x => x.IndexOf(':') < 0)) + ";" +
+                   string.Join(",", servers.Where(x => x.IndexOf(':') >= 0 && !x.StartsWith("fe80", StringComparison.OrdinalIgnoreCase)));
+        }
+
+        // Describe() ile kaydedilen ayara döner.
+        public static string Restore(string saved)
+        {
+            if (string.IsNullOrEmpty(saved) || saved == "dhcp") return ResetToDhcp();
+            var parts = saved.Split(';');
+            var p = new DnsProfile { Name = "Önceki DNS" };
+            foreach (var ip in parts[0].Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)) p.V4.Add(ip.Trim());
+            if (parts.Length > 1)
+                foreach (var ip in parts[1].Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)) p.V6.Add(ip.Trim());
+            if (p.V4.Count == 0) return ResetToDhcp();
+            return Apply(p, false);
         }
 
         // ISS'ler DoH'yi genelde TLS'teki sunucu adından (SNI) tanıyıp keser.
@@ -296,12 +351,13 @@ AdGuard (reklam engelli) | 94.140.14.14, 94.140.15.15 | 2a10:50c0::ad1:ff, 2a10:
             }
         }
 
-        // Windows 11'in "Şifreli DNS" ayarı: DohFlags=1 → kayıtlı şablonla yalnızca şifreli.
-        static void SetDoh(string guid, string sub, List<string> ips)
+        // Windows 11'in "Şifreli DNS" ayarı. DohFlags bitleri (DNS_DOH_SERVER_SETTINGS): 0x1 = kayıtlı şablonu kullan,
+        // 0x4 = DoH başarısız olursa şifresiz UDP/TCP'ye dön. 1 = yalnızca şifreli, 5 = şifreli tercih, şifresize izin.
+        static void SetDoh(string guid, string sub, List<string> ips, bool fallback)
         {
             foreach (var ip in ips)
                 using (var k = Registry.LocalMachine.CreateSubKey(DohKey + guid + @"\DohInterfaceSettings\" + sub + @"\" + ip))
-                    k.SetValue("DohFlags", 1L, RegistryValueKind.QWord);
+                    k.SetValue("DohFlags", fallback ? 5L : 1L, RegistryValueKind.QWord);
         }
 
         static bool HasDoh(string guid)
@@ -321,22 +377,14 @@ AdGuard (reklam engelli) | 94.140.14.14, 94.140.15.15 | 2a10:50c0::ad1:ff, 2a10:
             return Run(Path.Combine(Environment.SystemDirectory, "netsh.exe"), args, log);
         }
 
-        public static int Run(string file, string args, StringBuilder log)
+        // Zaman sınırlı (ProcessRunner); takılan komut öldürülür ve -1 döner.
+        public static int Run(string file, string args, StringBuilder log, int timeoutMs = ProcessRunner.DefaultTimeout)
         {
-            var psi = new ProcessStartInfo(file, args);
-            psi.UseShellExecute = false;
-            psi.CreateNoWindow = true;
-            psi.RedirectStandardOutput = true;
-            psi.RedirectStandardError = true;
-            psi.StandardOutputEncoding = Encoding.GetEncoding(CultureInfo.CurrentCulture.TextInfo.OEMCodePage);
-            using (var p = Process.Start(psi))
-            {
-                string output = p.StandardOutput.ReadToEnd() + p.StandardError.ReadToEnd();
-                p.WaitForExit();
-                if (p.ExitCode != 0 && log != null)
-                    log.AppendLine(Path.GetFileName(file) + " " + args + "\n  → " + output.Trim());
-                return p.ExitCode;
-            }
+            var r = ProcessRunner.Run(file, args, timeoutMs, log == null);
+            if (log != null && (r.TimedOut || r.ExitCode != 0))
+                log.AppendLine(Path.GetFileName(file) + " " + args + "\n  → " +
+                               (r.TimedOut ? "yanıt vermedi (" + timeoutMs / 1000 + " sn), durduruldu" : r.Output));
+            return r.TimedOut ? -1 : r.ExitCode;
         }
     }
 }

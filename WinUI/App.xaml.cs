@@ -17,10 +17,21 @@ namespace DnsPilot
         {
             Instance = this;
             InitializeComponent();
-            // Yakalanmamış hatalar %TEMP%\DnsPilot-hata.txt dosyasına yazılır (XAML hataları olay günlüğünde mesajsız görünür).
-            UnhandledException += (s, e) => Trace.Log(e.Message + System.Environment.NewLine + e.Exception);
-            // Arayüz dışından (COM geri çağrıları, iş parçacıkları) gelen hatalar da kayda geçsin.
-            System.AppDomain.CurrentDomain.UnhandledException += (s, e) => Trace.Log("Yakalanmamış hata: " + e.ExceptionObject);
+            // Arayüzde yakalanmamış bir hata uygulamayı kapatmaz: kayda geçer (%TEMP%\DnsPilot-kayit.txt) ve uygulama sürer.
+            // Önceden tepsi simgesi güncellemesi gibi küçük bir hata bile süreci sonlandırıyor, geride tıklanınca tepki
+            // vermeyen bir tepsi simgesi kalıyordu ("uygulama dondu").
+            UnhandledException += (s, e) =>
+            {
+                DnsDegistirici.Diag.Log("ARAYÜZ HATASI: " + e.Message + System.Environment.NewLine + e.Exception);
+                e.Handled = true;
+            };
+            System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (s, e) =>
+            {
+                DnsDegistirici.Diag.Log("GÖREV HATASI: " + e.Exception);
+                e.SetObserved();
+            };
+            // İş parçacıklarındaki hatalar süreci yine sonlandırır; en azından nedeni kayda geçsin.
+            System.AppDomain.CurrentDomain.UnhandledException += (s, e) => DnsDegistirici.Diag.Log("ÇÖKME: " + e.ExceptionObject);
         }
 
         protected override void OnLaunched(LaunchActivatedEventArgs args)
@@ -38,7 +49,10 @@ namespace DnsPilot
                 while (true)
                 {
                     showEvent.WaitOne();
-                    UI.TryEnqueue(() => ShowWindow(null));
+                    UI.TryEnqueue(() =>
+                    {
+                        try { ShowWindow(null); } catch (System.Exception ex) { DnsDegistirici.Diag.Error("pencere", ex); }
+                    });
                 }
             }) { IsBackground = true };
             listener.Start();

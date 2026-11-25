@@ -4,7 +4,8 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
-using System.Net;
+using System.Net.Http;
+using System.Threading;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -87,28 +88,70 @@ namespace DnsDegistirici
             catch (Exception) { return null; }
         }
 
+        // Ayarlar bellekte tutulur; dosya yalnızca dışarıdan (Not Defteri) değiştiyse yeniden okunur.
+        // Tüm erişim tek kilitle yapılır: arka plandaki bir kayıt (ör. güncelleme denetimi) ile arayüzden yapılan
+        // kayıt artık birbirinin değişikliğini silemez. Yazım önce geçici dosyaya yapılıp yerine taşınır;
+        // yazım sırasında kapanma/çökme dosyayı yarım bırakmaz. Okuma/yazma hatası uygulamayı çökertmez.
+        static readonly object sync = new object();
+        static Dictionary<string, string> cache;
+        static DateTime cacheStamp;
+
         public static string Get(string key, string fallback)
         {
-            string value;
-            return Load().TryGetValue(key, out value) ? value : fallback;
+            lock (sync)
+            {
+                string value;
+                return Current().TryGetValue(key, out value) ? value : fallback;
+            }
         }
 
         public static void Set(string key, string value)
         {
-            var all = Load();
-            all[key] = value;
-            File.WriteAllLines(FilePath, all.Select(kv => kv.Key + "=" + kv.Value), new UTF8Encoding(true));
+            lock (sync)
+            {
+                var all = Current();
+                string old;
+                if (value == null) { if (!all.Remove(key)) return; }
+                else if (all.TryGetValue(key, out old) && old == value) return;
+                else all[key] = value;
+                try
+                {
+                    string tmp = FilePath + ".yeni";
+                    File.WriteAllLines(tmp, all.Select(kv => kv.Key + "=" + kv.Value), new UTF8Encoding(true));
+                    File.Move(tmp, FilePath, true);
+                    cacheStamp = File.GetLastWriteTimeUtc(FilePath);
+                }
+                catch (Exception ex)
+                {
+                    Diag.Error("ayar kaydedilemedi: " + key, ex);
+                }
+            }
         }
 
-        static Dictionary<string, string> Load()
+        static Dictionary<string, string> Current()
         {
+            DateTime stamp;
+            try { stamp = File.Exists(FilePath) ? File.GetLastWriteTimeUtc(FilePath) : DateTime.MinValue; }
+            catch (Exception) { stamp = cacheStamp; }
+            if (cache != null && stamp == cacheStamp) return cache;
+
             var d = new Dictionary<string, string>();
-            if (!File.Exists(FilePath)) return d;
-            foreach (var line in File.ReadAllLines(FilePath, Encoding.UTF8))
+            try
             {
-                int i = line.IndexOf('=');
-                if (i > 0) d[line.Substring(0, i).Trim()] = line.Substring(i + 1).Trim();
+                if (File.Exists(FilePath))
+                    foreach (var line in File.ReadAllLines(FilePath, Encoding.UTF8))
+                    {
+                        int i = line.IndexOf('=');
+                        if (i > 0) d[line.Substring(0, i).Trim()] = line.Substring(i + 1).Trim();
+                    }
             }
+            catch (Exception ex)
+            {
+                Diag.Error("ayarlar okunamadı", ex);
+                if (cache != null) return cache;
+            }
+            cache = d;
+            cacheStamp = stamp;
             return d;
         }
     }
@@ -175,6 +218,8 @@ pastebin.com
 cloudflare-dns.com
 one.one.one.one
 dns.google
+dns.adguard-dns.com
+dns.quad9.net
 ";
 
         const string DefaultExclude = "com.tr\r\ngov.tr\r\n";
@@ -219,6 +264,31 @@ dns.google
             EnsureFile(HostlistPath, DefaultHostlist);
             EnsureFile(ExcludePath, DefaultExclude);
             EnsureFile(AutoHostlistPath, "");
+            EnsureDohHosts();
+        }
+
+        // Şifreli DNS sunucularının adları site listesinde olmalı; yoksa servis sağlayıcı DoH bağlantısını keser ve
+        // her DNS sorgusu zaman aşımını bekler. Eski sürümlerin listesinde AdGuard ve Quad9 yoktu; profillerdeki
+        // tüm DoH adları (kullanıcının eklediği sunucular dahil) eksikse listeye eklenir.
+        static void EnsureDohHosts()
+        {
+            try
+            {
+                var lines = File.ReadAllLines(HostlistPath, Encoding.UTF8).Select(l => l.Trim().ToLowerInvariant()).ToList();
+                var missing = new List<string>();
+                foreach (var p in ProfileStore.Load())
+                {
+                    if (p.Doh == null) continue;
+                    string host = new Uri(p.Doh).Host.ToLowerInvariant();
+                    if (!lines.Contains(host) && !missing.Contains(host)) missing.Add(host);
+                }
+                if (missing.Count == 0) return;
+                string text = File.ReadAllText(HostlistPath, Encoding.UTF8);
+                if (text.Length > 0 && !text.EndsWith("\n")) text += "\r\n";
+                File.WriteAllText(HostlistPath, text + string.Join("\r\n", missing) + "\r\n", new UTF8Encoding(false));
+                Diag.Log("site listesine DoH adları eklendi: " + string.Join(", ", missing));
+            }
+            catch (Exception ex) { Diag.Error("site listesi güncellenemedi", ex); }
         }
 
         public static bool IsRunning()
@@ -284,12 +354,15 @@ dns.google
             p.OutputDataReceived += Collect;
             p.ErrorDataReceived += Collect;
             p.Start();
+            // DNS Pilot kapanır ya da çökerse winws de kapansın; önceden arkada sahipsiz kalıp trafiği işlemeye devam ediyordu.
+            ChildJob.Assign(p);
             p.BeginOutputReadLine();
             p.BeginErrorReadLine();
+            Diag.Log("zapret başlatıldı: " + s.Name + " · " + exe + " " + a);
 
             if (p.WaitForExit(1500))
             {
-                p.WaitForExit(); // kalan çıktının toplanması için
+                p.WaitForExit(2000); // kalan çıktının toplanması için (sınırlı)
                 string text;
                 lock (output) text = output.ToString().Trim();
                 return "Zapret hemen kapandı (kod " + p.ExitCode + ")." + FailureHint(text) + "\n\n" + text;
@@ -332,16 +405,7 @@ dns.google
 
         static string Capture(string file, string args)
         {
-            var psi = new ProcessStartInfo(file, args);
-            psi.UseShellExecute = false;
-            psi.CreateNoWindow = true;
-            psi.RedirectStandardOutput = true;
-            using (var p = Process.Start(psi))
-            {
-                string text = p.StandardOutput.ReadToEnd();
-                p.WaitForExit(10000);
-                return text;
-            }
+            return ProcessRunner.Run(file, args, 10000).Output;
         }
 
         public static void Stop()
@@ -351,26 +415,49 @@ dns.google
                 try
                 {
                     p.Kill();
-                    p.WaitForExit(3000);
+                    if (!p.WaitForExit(3000)) Diag.Log("zapret 3 sn içinde kapanmadı (pid " + p.Id + ")");
                 }
-                catch (Exception) { }
+                catch (Exception ex) { Diag.Log("zapret durdurulamadı: " + ex.Message); }
                 p.Dispose();
             }
         }
 
         public static string CurrentVersion()
         {
-            return File.Exists(VersionPath) ? File.ReadAllText(VersionPath).Trim() : "";
+            try { return File.Exists(VersionPath) ? File.ReadAllText(VersionPath).Trim() : ""; }
+            catch (Exception) { return ""; }
+        }
+
+        // Zaman sınırlı HTTP istemcisi: yanıt vermeyen bir bağlantı işi sonsuza dek bekletmez.
+        static readonly HttpClient http = CreateHttp();
+
+        static HttpClient CreateHttp()
+        {
+            var c = new HttpClient(new SocketsHttpHandler { ConnectTimeout = TimeSpan.FromSeconds(15) }) { Timeout = TimeSpan.FromMinutes(5) };
+            c.DefaultRequestHeaders.UserAgent.ParseAdd("DNSPilot");
+            return c;
         }
 
         public static string LatestVersion()
         {
-            using (var wc = Client())
+            using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30)))
             {
-                string json = wc.DownloadString("https://api.github.com/repos/" + Repo + "/commits/master");
+                string json = http.GetStringAsync("https://api.github.com/repos/" + Repo + "/commits/master", cts.Token).GetAwaiter().GetResult();
                 var m = Regex.Match(json, "\"sha\"\\s*:\\s*\"([0-9a-f]{40})\"");
                 if (!m.Success) throw new Exception("GitHub yanıtı okunamadı.");
                 return m.Groups[1].Value;
+            }
+        }
+
+        static void Download(string url, string path)
+        {
+            using (var cts = new CancellationTokenSource(TimeSpan.FromMinutes(5)))
+            using (var resp = http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cts.Token).GetAwaiter().GetResult())
+            {
+                resp.EnsureSuccessStatusCode();
+                using (var src = resp.Content.ReadAsStream(cts.Token))
+                using (var dst = File.Create(path))
+                    src.CopyTo(dst);
             }
         }
 
@@ -386,8 +473,7 @@ dns.google
             DeleteDir(fresh);
             DeleteDir(old);
 
-            using (var wc = Client())
-                wc.DownloadFile("https://codeload.github.com/" + Repo + "/zip/" + sha, zip);
+            Download("https://codeload.github.com/" + Repo + "/zip/" + sha, zip);
             ZipFile.ExtractToDirectory(zip, extract);
 
             var src = Directory.GetDirectories(extract, "zapret-winws", SearchOption.AllDirectories).FirstOrDefault();
@@ -431,14 +517,6 @@ dns.google
                 output.AppendLine(e.Data);
                 if (output.Length > 2000) output.Remove(0, output.Length - 2000);
             }
-        }
-
-        static WebClient Client()
-        {
-            ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
-            var wc = new WebClient();
-            wc.Headers[HttpRequestHeader.UserAgent] = "DNSPilot";
-            return wc;
         }
 
         static void EnsureFile(string path, string content)

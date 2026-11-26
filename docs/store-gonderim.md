@@ -33,5 +33,5 @@ Sertifikasyon raporu (16.11.2026) üç madde içeriyordu. 2.2.0 hepsini ele alı
 - 26.11.2026'da Türk Telekom bağlantısında, Zapret kapalıyken doğrulandı: discord.com, gateway (WebSocket), cdn, media, updates; Discord masaüstü açıldı ve oturum kurdu (`[GatewaySocket] [READY]`); 119 MB indirmede doğrudan bağlantıyla aynı hız.
 - Sesli kanal: ses sunucusunun kontrol bağlantısı 2083 portundan açılır (dinleyici Cloudflare HTTPS portlarını da kabul eder); kanal `RTC_CONNECTED` oldu. Ses verisi UDP ile doğrudan gider.
 - Discord güncellemeleri: güncelleme adresi yerel aktarıcıya (`127.88.0.1:33080`) çevrilir; 26.11.2026'da manifest alındı, `discord_media` ve `discord_clips` modülleri kuruldu.
-- Kıyaslama (aynı hat, Zapret "Vodafone" ile): bağlantı başarısı %100 / %84, Discord API ilk bayt 77 / 95 ms, soğuk DNS 2–4 / 35–51 ms, boşta işlemci 0 / ~%17 çekirdek.
+- Kıyaslama (aynı hat, Zapret "Vodafone" ile, iç içe 2+2 tur; değerler sürücüsüz / Zapret): bağlantı başarısı %100 / %79, Discord API ilk bayt 77 / 95 ms, ses yolu UDP gecikmesi 52,2 / 52,3 ms, indirme (doğrudan bağlantıya oranla) 1,18 / 1,09, Discord açılışı (READY) 9,4 / 9,7 sn, özel bellek 33 / 35 MB, erişimin açılması 0,8 / 2,5 sn, soğuk DNS 2–4 / 35–51 ms.
 - Ayrıntılı bağlantı kaydı için uygulamanın `ayarlar.txt` dosyasına `erisim.kayit=1` ekleyin; kayıt `%TEMP%\DnsPilot-kayit.txt`.

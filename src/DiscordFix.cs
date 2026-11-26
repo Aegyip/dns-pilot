@@ -21,7 +21,9 @@ namespace DnsDegistirici
     public static class DiscordFix
     {
         public const string Key = "DESKTOP_TTI_UPDATE_CHECK_DEADLINE_MS";
-        public const int Value = 8000;
+        // Güncelleme denetimi bu yolla ~50 ms içinde başarısız olur; 3 sn Discord'un açılışını gereksiz geciktirmez.
+        public const int Value = 3000;
+        const int OldValue = 8000; // 2.2.0 ilk sürümü
         const string OldEndpointKey = "NEW_UPDATE_ENDPOINT", OldEndpointValue = "https://updates.discord.com./"; // 2.2.0 test sürümünden
 
         static IEnumerable<string> SettingsFiles()
@@ -46,7 +48,7 @@ namespace DnsDegistirici
                     if (obj == null) continue;
                     bool dirty = RemoveOldEndpoint(obj);
                     int? cur = Number(obj[Key]);
-                    if (cur == null || cur.Value <= 0) { obj[Key] = Value; dirty = true; }
+                    if (cur == null || cur.Value <= 0 || cur.Value == OldValue) { obj[Key] = Value; dirty = true; }
                     if (!dirty) continue;
                     Write(f, obj);
                     changed++;
@@ -66,7 +68,8 @@ namespace DnsDegistirici
                     var obj = Read(f);
                     if (obj == null) continue;
                     bool dirty = RemoveOldEndpoint(obj);
-                    if (Number(obj[Key]) == Value) { obj.Remove(Key); dirty = true; }
+                    int? v = Number(obj[Key]);
+                    if (v == Value || v == OldValue) { obj.Remove(Key); dirty = true; }
                     if (!dirty) continue;
                     Write(f, obj);
                     log?.Invoke("Discord güncelleme ayarı geri alındı: " + f);

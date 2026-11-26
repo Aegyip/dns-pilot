@@ -612,8 +612,11 @@ namespace DnsPilot
                     var strategy = CurrentStrategy(Zapret.LoadStrategies());
                     if (strategy == null) return "Strateji listesinde tanımlı strateji bulunamadı.";
                     name = strategy.Name;
-                    if (Bypass.Running) { Step("sürücüsüz erişim durduruluyor"); Bypass.Stop(); DiscordFix.StopWatching(); }
+                    if (Bypass.Running) { Step("sürücüsüz erişim durduruluyor"); Bypass.Stop(); }
                     else if (Nrpt.Present()) Nrpt.RemoveAll(); // önceki oturumdan (çökme) kalan kural
+                    // Zapret ile Discord güncelleyicisi doğrudan çalışır: aktarıcı adresi ve fail-open geri alınır (önceki oturumdan
+                    // kalmış olabilir; aksi halde Discord artık çalışmayan aktarıcıya sorar).
+                    DiscordFix.StopWatching(); DiscordFix.Remove(m => Diag.Log("erişim: " + m));
                     string filter = Settings.Get("zapret.filtre", Zapret.FilterList);
                     Step(strategy.Name);
                     string error;

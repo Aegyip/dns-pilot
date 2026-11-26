@@ -503,20 +503,23 @@ namespace DnsDegistirici
         // 256 KB: 64 KB ile indirme hızı doğrudan bağlantının ~%75'i, 256 KB ile ~%90-100'ü ölçüldü.
         public static int CopyBufferSize = 256 * 1024;
 
+        // Tampon ortak havuzdan kiralanır: 256 KB'lık dizi büyük nesne yığınına (LOH) düşer; bağlantı başına yeni dizi
+        // ayırmak, çok bağlantı açıp kapatan Discord'da yığını şişirip parçalıyordu.
         static async Task<long> Copy(Stream from, Stream to, CancellationToken ct)
         {
-            var buf = new byte[CopyBufferSize];
+            var buf = System.Buffers.ArrayPool<byte>.Shared.Rent(CopyBufferSize);
             long total = 0;
             try
             {
                 int r;
-                while ((r = await from.ReadAsync(buf, ct)) > 0)
+                while ((r = await from.ReadAsync(buf.AsMemory(0, CopyBufferSize), ct)) > 0)
                 {
                     await to.WriteAsync(buf.AsMemory(0, r), ct);
                     total += r;
                 }
             }
             catch { }
+            finally { System.Buffers.ArrayPool<byte>.Shared.Return(buf); }
             try { (to as NetworkStream)?.Socket.Shutdown(SocketShutdown.Send); } catch { }
             return total;
         }

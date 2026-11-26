@@ -59,8 +59,11 @@ namespace DnsDegistirici
                 sockets.Add(udp);
                 _ = DnsUdpLoop(udp, cts.Token);
                 var dnsTcp = Listen(53); _ = AcceptLoop(dnsTcp, DnsTcp, cts.Token);
-                var tls = Listen(443); _ = AcceptLoop(tls, HandleTls, cts.Token);
-                var http = Listen(80); _ = AcceptLoop(http, HandleHttp, cts.Token);
+                // Discord ses sunucuları WebSocket'i 2083 gibi Cloudflare HTTPS portlarından açar
+                // (wss://x.discord.media:2083); hangi porta gelindiyse hedefe de o porttan bağlanılır.
+                // 443 ve 80 zorunlu, diğerleri açılamazsa atlanır.
+                foreach (int p in TlsPorts) { int port = p; ListenOptional(port, port == 443, (s, c) => HandleTls(s, port, c)); }
+                foreach (int p in HttpPorts) { int port = p; ListenOptional(port, port == 80, (s, c) => HandleHttp(s, port, c)); }
             }
             catch (Exception ex)
             {
@@ -95,6 +98,17 @@ namespace DnsDegistirici
             try { cts?.Cancel(); } catch { }
             foreach (var s in sockets) { try { s.Dispose(); } catch { } }
             sockets.Clear();
+        }
+
+        static readonly int[] TlsPorts = { 443, 2053, 2083, 2087, 2096, 8443 };
+        static readonly int[] HttpPorts = { 80, 2052, 2082, 2086, 2095, 8080, 8880 };
+
+        void ListenOptional(int port, bool required, Func<Socket, CancellationToken, Task> handler)
+        {
+            TcpListener l;
+            try { l = Listen(port); }
+            catch (Exception) when (!required) { Log("Port açılamadı, atlandı: " + port); return; }
+            _ = AcceptLoop(l, handler, cts.Token);
         }
 
         TcpListener Listen(int port)
@@ -233,7 +247,7 @@ namespace DnsDegistirici
 
         // ---- TLS (443) ----
 
-        async Task HandleTls(Socket client, CancellationToken ct)
+        async Task HandleTls(Socket client, int port, CancellationToken ct)
         {
             Interlocked.Increment(ref connections);
             Interlocked.Increment(ref active);
@@ -253,7 +267,7 @@ namespace DnsDegistirici
                 host = TlsSplit.SniHost(hello);
                 if (host == null) { Log("ClientHello'da site adı yok"); return; }
 
-                up = await Connect(host, 443, ct);
+                up = await Connect(host, port, ct);
                 if (up == null) { Log("Bağlanamadı: " + host); return; }
                 if (Verbose) Log("→ " + host + " (" + up.RemoteEndPoint + ") hello " + hello.Length + " B, sni@" + TlsSplit.SniOffset(hello));
                 await TlsSplit.Send(up, hello, Mode, ct);
@@ -276,7 +290,7 @@ namespace DnsDegistirici
 
         // ---- Düz HTTP (80): Host başlığına göre ilet ----
 
-        async Task HandleHttp(Socket client, CancellationToken ct)
+        async Task HandleHttp(Socket client, int port, CancellationToken ct)
         {
             Socket up = null;
             try
@@ -298,7 +312,7 @@ namespace DnsDegistirici
                 string head = Encoding.ASCII.GetString(buf, 0, n);
                 var m = System.Text.RegularExpressions.Regex.Match(head, @"\r\nHost:\s*([^\r:]+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
                 if (!m.Success) return;
-                up = await Connect(m.Groups[1].Value.Trim(), 80, ct);
+                up = await Connect(m.Groups[1].Value.Trim(), port, ct);
                 if (up == null) return;
                 // DPI düz HTTP'de "Host:" değerini birebir karşılaştırır. Sonuna nokta eklenmiş tam alan adı
                 // ("discord.com.") geçerlidir, sunucular kabul eder, DPI eşleştiremez (bölme ve harf düzeni denendi, işe yaramadı).

@@ -22,7 +22,8 @@ namespace DnsPilot
     {
         public List<DnsProfile> Profiles = new List<DnsProfile>();
         public DnsState Dns = new DnsState { Summary = "Durum okunuyor…" };
-        public bool ZapretRunning, ZapretInstalled, EngineRemoved;
+        public bool ZapretRunning, ZapretInstalled, EngineRemoved, BypassRunning;
+        public bool AccessOn { get { return ZapretRunning || BypassRunning; } }
         public List<ZapretStrategy> Strategies = new List<ZapretStrategy>();
         public ZapretStrategy Strategy;
         public string ZapretVersion = "";
@@ -110,6 +111,9 @@ namespace DnsPilot
             try { s.Profiles = ProfileStore.Load(); } catch (Exception ex) { s.Profiles = prev.Profiles; Diag.Error("profiller", ex); }
             try { s.Dns = DnsManager.GetState(s.Profiles); } catch (Exception ex) { s.Dns = prev.Dns; Diag.Error("DNS durumu", ex); }
             try { s.ZapretRunning = Zapret.IsRunning(); } catch (Exception) { s.ZapretRunning = prev.ZapretRunning; }
+            s.BypassRunning = Instance.Bypass.Running;
+            // Discord kapanırken ayarlarını yeniden yazar; erişim açıkken Discord uyumluluk ayarı korunur.
+            if (s.BypassRunning && DiscordCompat) try { DiscordFix.Ensure(m => Diag.Log("erişim: " + m)); } catch (Exception) { }
             try { s.ZapretInstalled = Zapret.Installed; s.EngineRemoved = Zapret.EngineRemoved; }
             catch (Exception) { s.ZapretInstalled = prev.ZapretInstalled; s.EngineRemoved = prev.EngineRemoved; }
             try { s.Strategies = Zapret.LoadStrategies(); } catch (Exception ex) { s.Strategies = prev.Strategies; Diag.Error("stratejiler", ex); }
@@ -330,21 +334,29 @@ namespace DnsPilot
                 RequestRefresh(0);
             });
 
-            bool autoZapret = Settings.Get("zapret.otomatik", "1") == "1" && Zapret.Installed;
-            if (autoZapret && !Zapret.IsRunning())
+            bool zapretMethod = Method == MethodZapret;
+            bool autoAccess = Settings.Get("zapret.otomatik", "1") == "1";
+            if (autoAccess && !(zapretMethod && Zapret.IsRunning()))
             {
                 ThreadPool.QueueUserWorkItem(delegate
                 {
                     // Açılışta ağ birkaç saniye geç gelebilir; şifreli DNS testi boşa düşmesin.
                     for (int i = 0; i < 60 && !NetworkInterface.GetIsNetworkAvailable(); i++) Thread.Sleep(1000);
-                    Thread.Sleep(3000);
-                    if (!Zapret.IsRunning()) StartZapret();
+                    if (zapretMethod) Thread.Sleep(3000);
+                    if (!Zapret.IsRunning() && !Bypass.Running) StartAccess();
                 });
             }
-            else if (!autoZapret && SavedDns != null && !Zapret.IsRunning())
+            else if (!autoAccess)
             {
-                // Uygulama Zapret açıkken kapanmış/çökmüş: Zapret'in değiştirdiği DNS geri alınır.
-                Enqueue(new Job { Title = "Önceki DNS ayarına dönülüyor", Work = RestoreSavedDns });
+                // Uygulama erişim açıkken kapanmış/çökmüş olabilir: kalan ad çözümleme kuralı ve Zapret'in değiştirdiği DNS
+                // geri alınır. Kural kalırsa listedeki sitelere (Discord) uygulama açılana kadar ulaşılamaz.
+                ThreadPool.QueueUserWorkItem(delegate
+                {
+                    try { if (Nrpt.Present()) { Nrpt.RemoveAll(); DnsManager.FlushCache(); Diag.Log("kalan ad çözümleme kuralı silindi"); } }
+                    catch (Exception ex) { Diag.Error("NRPT temizliği", ex); }
+                });
+                if (SavedDns != null && !Zapret.IsRunning())
+                    Enqueue(new Job { Title = "Önceki DNS ayarına dönülüyor", Work = RestoreSavedDns });
             }
 
             if (!Settings.Packaged && Settings.Get("guncelleme.otomatik", "1") == "1")
@@ -368,6 +380,7 @@ namespace DnsPilot
             {
                 try
                 {
+                    if (Bypass.Running) Bypass.Stop();
                     Zapret.Stop();
                     RestoreSavedDns();
                 }
@@ -498,6 +511,84 @@ namespace DnsPilot
             return error;
         }
 
+        // ---- Erişim: sürücüsüz şeffaf mod (varsayılan) ya da Zapret ----
+        // Store paketi sürücü içeremediği için varsayılan yöntem sürücüsüz moddur (src\Bypass.cs). Zapret yalnızca
+        // motoru kuruluysa (GitHub kurulumu) seçilebilir. İkisi aynı anda çalışmaz.
+
+        public const string MethodBypass = "surucusuz", MethodZapret = "zapret";
+        public readonly Bypass Bypass = new Bypass();
+
+        public static string Method
+        {
+            get
+            {
+                string m = Settings.Get("erisim.yontem", MethodBypass);
+                return m == MethodZapret && Zapret.Installed ? MethodZapret : MethodBypass;
+            }
+        }
+
+        // Discord masaüstü uygulamasının güncelleme kontrolü sürücüsüz yolla geçemez (TLS 1.2, bkz. DiscordFix);
+        // bu seçenek Discord'un kendi "güncelleme başarısızsa yine de aç" ayarını yazar.
+        public static bool DiscordCompat { get { return Settings.Get("erisim.discord", "1") == "1"; } }
+
+        public void SetDiscordCompat(bool on)
+        {
+            Settings.Set("erisim.discord", on ? "1" : "0");
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                try
+                {
+                    if (on && Bypass.Running) { DiscordFix.Ensure(m => Diag.Log("erişim: " + m)); DiscordFix.StartWatching(m => Diag.Log("erişim: " + m)); }
+                    else if (!on) { DiscordFix.StopWatching(); DiscordFix.Remove(m => Diag.Log("erişim: " + m)); }
+                }
+                catch (Exception ex) { Diag.Error("Discord ayarı", ex); }
+            });
+        }
+
+        public void StartAccess()
+        {
+            if (Method == MethodZapret) StartZapret(); else StartBypass();
+        }
+
+        // Tek iş: hem sürücüsüz mod hem Zapret durur (aynı türdeki işler kuyrukta birbirinin yerine geçer).
+        public void StopAccess() { StopZapret(); }
+
+        // Yöntem değişti: erişim açıksa yeni yöntemle yeniden başlatılır (başlatan iş diğer yöntemi kendisi durdurur).
+        public void AccessMethodChanged()
+        {
+            bool on = PendingZapret ?? snapshot.AccessOn;
+            if (on) StartAccess(); else RequestRefresh(0);
+        }
+
+        public void StartBypass()
+        {
+            Enqueue(new Job
+            {
+                Kind = "zapret",
+                Title = "Erişim başlatılıyor",
+                NotifyTitle = "Erişim",
+                ZapretTarget = true,
+                Work = () =>
+                {
+                    if (!Elevated) return "Sürücüsüz erişim yönetici izni gerektirir.";
+                    if (Zapret.IsRunning()) { Step("Zapret durduruluyor"); Zapret.Stop(); }
+                    Bypass.Log = m => Diag.Log("erişim: " + m);
+                    Bypass.Verbose = Settings.Get("erisim.kayit", "0") == "1";
+                    Bypass.Hosts = () => { Zapret.EnsureUserFiles(); return File.ReadAllLines(Zapret.HostlistPath); };
+                    Bypass.SplitMode mode;
+                    Bypass.Mode = Enum.TryParse(Settings.Get("erisim.bolme", "TlsRecord"), out mode) ? mode : Bypass.SplitMode.TlsRecord;
+                    if (Bypass.Running) Bypass.Stop();
+                    Step("ad çözümleme kuralı ekleniyor");
+                    string error = Bypass.Start();
+                    if (error == null && DiscordCompat) { DiscordFix.Ensure(m => Diag.Log("erişim: " + m)); DiscordFix.StartWatching(m => Diag.Log("erişim: " + m)); }
+                    SetZapretError(error);
+                    if (error != null) Diag.Log("erişim: " + error);
+                    return error;
+                },
+                Success = () => "Erişim etkin. Discord'u yeniden başlatmanız gerekebilir.",
+            });
+        }
+
         // ---- Zapret ----
 
         public static ZapretStrategy CurrentStrategy(List<ZapretStrategy> strategies)
@@ -521,6 +612,8 @@ namespace DnsPilot
                     var strategy = CurrentStrategy(Zapret.LoadStrategies());
                     if (strategy == null) return "Strateji listesinde tanımlı strateji bulunamadı.";
                     name = strategy.Name;
+                    if (Bypass.Running) { Step("sürücüsüz erişim durduruluyor"); Bypass.Stop(); DiscordFix.StopWatching(); }
+                    else if (Nrpt.Present()) Nrpt.RemoveAll(); // önceki oturumdan (çökme) kalan kural
                     string filter = Settings.Get("zapret.filtre", Zapret.FilterList);
                     Step(strategy.Name);
                     string error;
@@ -538,19 +631,21 @@ namespace DnsPilot
         public void StopZapret()
         {
             ZapretError = null;
+            bool bypass = Bypass.Running;
             Enqueue(new Job
             {
                 Kind = "zapret",
-                Title = "Zapret durduruluyor",
-                NotifyTitle = "Zapret",
+                Title = bypass ? "Erişim durduruluyor" : "Zapret durduruluyor",
+                NotifyTitle = bypass ? "Erişim" : "Zapret",
                 ZapretTarget = false,
                 Work = () =>
                 {
+                    if (Bypass.Running) { Bypass.Stop(); DiscordFix.StopWatching(); DiscordFix.Remove(m => Diag.Log("erişim: " + m)); }
                     Zapret.Stop();
                     if (SavedDns != null) Step("önceki DNS ayarına dönülüyor");
                     return RestoreSavedDns();
                 },
-                Success = () => "Zapret durduruldu.",
+                Success = () => bypass ? "Erişim durduruldu." : "Zapret durduruldu.",
             });
         }
 

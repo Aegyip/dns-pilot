@@ -20,8 +20,8 @@ namespace DnsPilot.Pages
         {
             var snap = App.State;
             var state = snap.Dns;
-            bool zapretOn = snap.ZapretRunning;
-            bool zapretTarget = App.PendingZapret ?? zapretOn;
+            bool accessOn = snap.AccessOn;
+            bool accessTarget = App.PendingZapret ?? accessOn;
             var strategy = snap.Strategy;
 
             string servers = state.Servers.Count == 0 ? "—" : string.Join(", ", state.Servers.Take(4));
@@ -29,15 +29,12 @@ namespace DnsPilot.Pages
                 state.HasAdapter ? state.AdapterName + " bağlantısı · Sunucular: " + servers : "Etkin bir ağ bağlantısı algılanmadı.",
                 Btn("Değiştir", () => DnsPilot.App.Instance.ShowWindow("DNS"))));
 
-            if (!snap.ZapretInstalled && !Settings.Packaged)
-                s.Children.Add(EngineMissingCard());
-            else
-                s.Children.Add(Card("", "Zapret",
-                    !snap.ZapretInstalled ? "Zapret motoru bulunamadı."
-                    : zapretTarget != zapretOn ? (zapretTarget ? "Başlatılıyor…" : "Durduruluyor…")
-                    : zapretOn ? "Etkin · " + (strategy != null ? strategy.Name : "Varsayılan") + " stratejisi kullanılıyor"
-                    : "Devre dışı · Erişim kısıtlamalarını aşmak için etkinleştirin",
-                    Toggle(zapretTarget, on => { if (on) App.StartZapret(); else App.StopZapret(); }, snap.ZapretInstalled)));
+            s.Children.Add(Card("\uEA18", "Erişim",
+                accessTarget != accessOn ? (accessTarget ? "Başlatılıyor…" : "Durduruluyor…")
+                : snap.BypassRunning ? "Etkin · Discord gibi kısıtlanan hizmetlere sürücüsüz erişim"
+                : snap.ZapretRunning ? "Etkin · Zapret · " + (strategy != null ? strategy.Name : "Varsayılan") + " stratejisi"
+                : "Devre dışı · Erişim kısıtlamalarını aşmak için etkinleştirin",
+                Toggle(accessTarget, on => { if (on) App.StartAccess(); else App.StopAccess(); })));
             ZapretErrorBar(s);
 
             var u = App.Updates;

@@ -79,7 +79,7 @@ namespace DnsPilot
             var items = new List<TrayMenuHost.Entry>();
             var s = app.State;
             var state = s.Dns;
-            bool zapretOn = app.PendingZapret ?? s.ZapretRunning;
+            bool zapretOn = app.PendingZapret ?? s.AccessOn;
             string pendingDns = app.PendingDns;
             var strategy = s.Strategy;
 
@@ -94,7 +94,9 @@ namespace DnsPilot
             items.Add(new TrayMenuHost.Item { Text = state.Summary, Glyph = "", Enabled = false });
             items.Add(new TrayMenuHost.Item
             {
-                Text = s.ZapretRunning ? "Zapret: etkin · " + (strategy != null ? strategy.Name : "?") : "Zapret: devre dışı",
+                Text = s.BypassRunning ? "Erişim: etkin · sürücüsüz"
+                     : s.ZapretRunning ? "Erişim: etkin · Zapret · " + (strategy != null ? strategy.Name : "?")
+                     : "Erişim: devre dışı",
                 Glyph = "",
                 Enabled = false
             });
@@ -102,10 +104,9 @@ namespace DnsPilot
 
             items.Add(new TrayMenuHost.Item
             {
-                Text = zapretOn ? "Zapret'i durdur" : "Zapret'i başlat",
+                Text = zapretOn ? "Erişimi durdur" : "Erişimi başlat",
                 Glyph = zapretOn ? "" : "",
-                Enabled = s.ZapretInstalled,
-                Action = () => { if (zapretOn) app.StopZapret(); else app.StartZapret(); }
+                Action = () => { if (zapretOn) app.StopAccess(); else app.StartAccess(); }
             });
             items.Add(new TrayMenuHost.Separator());
 
@@ -146,7 +147,7 @@ namespace DnsPilot
             {
                 var s = app.State;
                 var state = s.Dns;
-                bool zapretOn = s.ZapretRunning;
+                bool zapretOn = s.AccessOn;
                 Color color = !state.HasAdapter ? Color.FromArgb(220, 38, 38)   // kırmızı: bağlantı yok
                             : !state.IsStatic   ? Color.FromArgb(115, 115, 115) // gri: servis sağlayıcı DNS'i
                             : state.DohOn       ? Color.FromArgb(22, 163, 74)   // yeşil: şifreli
@@ -156,7 +157,7 @@ namespace DnsPilot
                 lastDot = dot;
 
                 string activity = app.Activity;
-                string tip = AppController.Clip(activity ?? state.Summary + (zapretOn ? " · Zapret" : ""), 63);
+                string tip = AppController.Clip(activity ?? state.Summary + (zapretOn ? " · Erişim" : ""), 63);
                 if (tip != lastTip) icon.ToolTipText = tip;
                 lastTip = tip;
             }

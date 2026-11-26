@@ -1,15 +1,17 @@
 # MSIX paketini üretir: dist\DNSPilot.msix
 #   -Tools  : makeappx.exe ve signtool.exe'nin bulunduğu klasör (Windows SDK / Microsoft.Windows.SDK.BuildTools)
-#   -Engine : zapret motor klasörü (winws2.exe, WinDivert.dll, WinDivert64.sys, cygwin1.dll, lua\ ...)
+#   -Engine : (isteğe bağlı) zapret motor klasörü; Store paketi motorsuz üretilir (winws2.exe, WinDivert.dll, WinDivert64.sys, cygwin1.dll, lua\ ...)
 #   -CertPfx: (isteğe bağlı) yerel test için imza sertifikası. Store'a gönderilecek paket imzasız kalır; Store imzalar.
 param(
     [Parameter(Mandatory = $true)][string]$Tools,
-    [Parameter(Mandatory = $true)][string]$Engine,
+    [string]$Engine,  # boş: motorsuz paket (Microsoft Store: sürücü içeren paket kabul edilmez)
     [string]$CertPfx,
     [string]$CertPassword,
+    [string]$CertThumbprint,  # yerel test: kullanıcı deposundaki sertifikayla imzala
     # Local test only: package under a test identity signed with a self-signed certificate.
     [string]$TestName,
     [string]$TestPublisher,
+    [int]$TestRevision = 0,  # yerel test: aynı sürümü yeniden kurabilmek için son hane
     [string]$Out = 'dist\DNSPilot.msix'
 )
 $ErrorActionPreference = 'Stop'
@@ -23,7 +25,7 @@ if (-not (Test-Path dist\winui-publish\DnsPilot.exe)) { & (Join-Path $root 'WinU
 # 2) Paket düzeni
 $layout = 'dist\msix-layout'
 if (Test-Path $layout) { Remove-Item $layout -Recurse -Force }
-New-Item -ItemType Directory -Force "$layout\Assets", "$layout\zapret\motor" | Out-Null
+New-Item -ItemType Directory -Force "$layout\Assets" | Out-Null
 Copy-Item dist\winui-publish\* $layout -Recurse -Force  # Assets klasörü pakette zaten var: birleştir
 Copy-Item msix\AppxManifest.xml $layout
 if ($TestName -and $TestPublisher) {
@@ -31,19 +33,24 @@ if ($TestName -and $TestPublisher) {
     $x = [IO.File]::ReadAllText($mf)
     $x = [regex]::Replace($x, 'Name="Aegyip\.DNSPilot"', "Name=""$TestName""")
     $x = [regex]::Replace($x, 'Publisher="CN=[^"]+"', "Publisher=""$TestPublisher""")
+    if ($TestRevision -gt 0) { $x = [regex]::Replace($x, '(<Identity [^>]*Version="\d+\.\d+\.\d+\.)0"', ('${1}' + $TestRevision + '"')) }
     [IO.File]::WriteAllText($mf, $x, (New-Object Text.UTF8Encoding $false))
 }
-# Motor: yalnızca çalışması için gerekenler (cmd betikleri ve örnekler hariç)
-foreach ($f in 'winws2.exe', 'winws.exe', 'WinDivert.dll', 'WinDivert64.sys', 'cygwin1.dll', 'windivert.filter') {
-    $p = Join-Path $Engine $f
-    if (Test-Path $p) { Copy-Item $p "$layout\zapret\motor" -Recurse }
+# Motor: yalnızca çalışması için gerekenler (cmd betikleri ve örnekler hariç).
+# Store paketi motorsuz üretilir: WinDivert sürücüsü Store politikası 10.2.4.2'ye takılır; uygulama sürücüsüz erişimi kullanır.
+if ($Engine) {
+    New-Item -ItemType Directory -Force "$layout\zapret\motor" | Out-Null
+    foreach ($f in 'winws2.exe', 'winws.exe', 'WinDivert.dll', 'WinDivert64.sys', 'cygwin1.dll', 'windivert.filter') {
+        $p = Join-Path $Engine $f
+        if (Test-Path $p) { Copy-Item $p "$layout\zapret\motor" -Recurse }
+    }
+    foreach ($d in 'lua', 'files') {
+        $p = Join-Path $Engine $d
+        if (Test-Path $p) { Copy-Item $p "$layout\zapret\motor" -Recurse }
+    }
+    $ver = Join-Path (Split-Path $Engine -Parent) 'surum.txt'
+    if (Test-Path $ver) { Copy-Item $ver "$layout\zapret\surum.txt" }
 }
-foreach ($d in 'lua', 'files') {
-    $p = Join-Path $Engine $d
-    if (Test-Path $p) { Copy-Item $p "$layout\zapret\motor" -Recurse }
-}
-$ver = Join-Path (Split-Path $Engine -Parent) 'surum.txt'
-if (Test-Path $ver) { Copy-Item $ver "$layout\zapret\surum.txt" }
 
 # Simgeler: logo PNG'lerinden gereken boyutlar
 function Save-Scaled($src, $size, $dst) {
@@ -67,7 +74,11 @@ $out = $Out
 if ($LASTEXITCODE -ne 0) { throw "makeappx başarısız" }
 
 # 4) Yerel test için imzala (isteğe bağlı)
-if ($CertPfx) {
+if ($CertThumbprint) {
+    & (Join-Path $Tools 'signtool.exe') sign /fd SHA256 /sha1 $CertThumbprint /s My $out
+    if ($LASTEXITCODE -ne 0) { throw "signtool başarısız" }
+}
+elseif ($CertPfx) {
     & (Join-Path $Tools 'signtool.exe') sign /fd SHA256 /f $CertPfx /p $CertPassword $out
     if ($LASTEXITCODE -ne 0) { throw "signtool başarısız" }
 }

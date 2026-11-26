@@ -31,8 +31,12 @@ namespace DnsPilot
             if (AppWindow.TitleBar != null)
                 AppWindow.TitleBar.PreferredHeightOption = TitleBarHeightOption.Tall; // Ayarlar'daki 48 px başlık
 
+            // 1000x720 DIP; yüksek ölçekte (ör. 3000x2000 %250, 1920x1080 %175) çalışma alanına sığdırılır.
             double scale = GetDpiForWindow(hwnd) / 96.0;
-            AppWindow.Resize(new Windows.Graphics.SizeInt32((int)(1000 * scale), (int)(720 * scale)));
+            var work = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
+            int w = Math.Min((int)(1000 * scale), (int)(work.Width * 0.94));
+            int h = Math.Min((int)(720 * scale), (int)(work.Height * 0.94));
+            AppWindow.Resize(new Windows.Graphics.SizeInt32(w, h));
             CenterOnScreen();
 
             // Kapat düğmesi uygulamayı kapatmaz; tepside çalışmaya devam eder (Çıkış tepsi menüsünden).
@@ -46,12 +50,14 @@ namespace DnsPilot
             Activated += (s, e) =>
                 TitleText.Opacity = e.WindowActivationState == WindowActivationState.Deactivated ? 0.5 : 1.0;
 
-            // Windows Ayarlar'daki gibi sayfa değişiminde aşağıdan yukarı kayarak giriş.
+            // Windows Ayarlar'daki gibi sayfa değişiminde aşağıdan yukarı kayarak giriş. İlk sayfa animasyonsuz açılır:
+            // Store sertifikasyonundaki ekran görüntüsü (%250 ölçek) açılış animasyonunun ortasında yarım çizilmiş
+            // içerik gösteriyordu.
+            Nav.SelectedItem = Nav.MenuItems[0];
             ContentFrame.ContentTransitions = new Microsoft.UI.Xaml.Media.Animation.TransitionCollection
             {
                 new Microsoft.UI.Xaml.Media.Animation.EntranceThemeTransition { FromVerticalOffset = 40 }
             };
-            Nav.SelectedItem = Nav.MenuItems[0];
         }
 
         void CenterOnScreen()

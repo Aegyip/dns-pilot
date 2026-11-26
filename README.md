@@ -83,13 +83,21 @@ dotnet build WinUI\DnsPilot.WinUI.csproj -c Debug -p:Platform=x64
   <img src="docs/img/dns-zapret.png" alt="DNS: ISS yönlendirmesini aşar ve sorguları şifreler. Zapret: DPI kısıtlamalarını aşar." width="100%">
 </p>
 
+### Sürücüsüz erişim (2.2)
+
+Varsayılan erişim yöntemi artık sürücü kurmaz; Microsoft Store sürümü de bunu kullanır. Zapret yalnızca GitHub kurulumunda, **Erişim → Erişim yöntemi** altından seçilebilir.
+
+- Windows'un ad çözümleme ilkesine (NRPT) geçici bir kural eklenir: yalnızca site listesindeki adlar (discord.com …) uygulamanın yerel DNS'ine (`127.88.0.1`) sorulur, diğer her şey eskisi gibi çözülür. Kural yeniden başlatınca kendiliğinden silinir.
+- Bu adlara açılan bağlantılar `127.88.0.1:443`'e gelir; uygulama site adını okuyup gerçek sunucuya doğrudan bağlanır ve yalnızca ilk paketi (TLS ClientHello) iki TLS kaydına bölerek gönderir. Şifre çözülmez, trafik uzak bir sunucudan dolaşmaz, **ping değişmez**. Discord sesi (UDP) bu yola hiç uğramaz.
+- Discord masaüstü güncelleyicisi yalnızca TLS 1.2 konuştuğu için bu yolla geçemez; **Discord uyumluluğu** seçeneği Discord'un kendi "güncelleme denetimi başarısızsa yine de aç" ayarını açar (Discord birkaç saniye sonra açılır, istemcinin kendisi discord.com'dan güncel yüklenir).
+
 > [!TIP]
-> Hangi stratejinin size uygun olduğunu bilmiyorsanız **Ayarlar → Zapret → En uygun stratejiyi bul**'u kullanın. Yaklaşık bir dakika içinde bağlantınızda en iyi çalışanı seçer.
+> Zapret kullanıyorsanız ve hangi stratejinin size uygun olduğunu bilmiyorsanız **Ayarlar → Erişim → En uygun stratejiyi bul**'u kullanın. Yaklaşık bir dakika içinde bağlantınızda en iyi çalışanı seçer.
 
 ### Sorun olursa
 - İnternet kesilirse menüden **Otomatik (modem / ISS)** seçin.
-- Bir site bozulursa **Zapret'i durdurun** ya da başka bir strateji deneyin.
-- Uygulamadan çıkıldığında Zapret de kapanır; Zapret'in açılırken yaptığı DNS değişikliği geri alınır.
+- Bir site bozulursa **erişimi durdurun** ya da başka bir bölme biçimi / strateji deneyin.
+- Uygulamadan çıkıldığında erişim de kapanır; ad çözümleme kuralı ve Zapret'in açılırken yaptığı DNS değişikliği geri alınır.
 - Sorunu bildirirken **Ayarlar → Sistem → Tanılama bilgilerini kopyala** ile alınan metni bildirime ekleyin. Kayıt dosyası: `%TEMP%\DnsPilot-kayit.txt`.
 
 <details>
@@ -100,7 +108,7 @@ dotnet build WinUI\DnsPilot.WinUI.csproj -c Debug -p:Platform=x64
 | `dotnet build WinUI\DnsPilot.WinUI.csproj -c Debug -p:Platform=x64` | `bin\winui\DnsPilot.exe` (geliştirme; veri dosyaları üstteki `bin\`'de aranır) |
 | `powershell -ExecutionPolicy Bypass -File WinUI\publish.ps1` | `dist\winui-publish\` (.NET ve Windows App SDK gömülü dağıtım klasörü) |
 | `powershell -ExecutionPolicy Bypass -File installer\build-setup.ps1` | `dist\DNSPilot-Setup-<sürüm>.exe` (sessiz kurulum `/S`, kaldırma `/uninstall /S`) |
-| `powershell -ExecutionPolicy Bypass -File msix\build-msix.ps1 -Tools <SDK x64> -Engine bin\zapret\motor` | `dist\DNSPilot.msix` (Microsoft Store paketi; `-Out` ile ad verilebilir) |
+| `powershell -ExecutionPolicy Bypass -File msix\build-msix.ps1 -Tools <SDK x64>` | `dist\DNSPilot.msix` (Microsoft Store paketi, Zapret motoru ve sürücü içermez; `-Out` ile ad verilebilir) |
 
 Kurucu ve MSIX, yayın klasörünü (`dist\winui-publish\`) kullanır; yoksa önce `WinUI\publish.ps1` çalıştırılır. `<SDK x64>`: `%USERPROFILE%\.nuget\packages\microsoft.windows.sdk.buildtools\<sürüm>\bin\<sürüm>\x64`.
 </details>
@@ -110,11 +118,13 @@ Kurucu ve MSIX, yayın klasörünü (`dist\winui-publish\`) kullanır; yoksa ön
 
 ```
 WinUI/          Uygulama arayüzü (WinUI 3, .NET 8): pencere, sayfalar, tepsi menüsü, bildirimler
-  AppController.cs İşler: DNS, Zapret, strateji testi, güncellemeler, otomatik başlatma
-  Pages/          Giriş, DNS, Zapret, Sistem, Güncellemeler (Windows Ayarlar kartları)
+  AppController.cs İşler: DNS, erişim (sürücüsüz / Zapret), strateji testi, güncellemeler, otomatik başlatma
+  Pages/          Giriş, DNS, Erişim, Sistem, Güncellemeler (Windows Ayarlar kartları)
   TrayMenuHost.cs Windows 11 tarzı tepsi menüsü (akrilik)
-src/            Paylaşılan mantık (DNS, Zapret, ayarlar, tanılama)
+src/            Paylaşılan mantık (DNS, erişim, Zapret, ayarlar, tanılama)
   Dns.cs          DNS ve DoH ayarları, hız testi
+  Bypass.cs       Sürücüsüz erişim: NRPT kuralı, yerel DNS, ClientHello bölen yerel dinleyici, DoH
+  DiscordFix.cs   Discord masaüstü uyumluluk ayarı
   Zapret.cs       Zapret motoru ve ayar dosyaları
   StrategyTest.cs En uygun stratejiyi ölçme
   ProcessRunner.cs Zaman sınırlı dış komutlar (netsh, schtasks, sc)

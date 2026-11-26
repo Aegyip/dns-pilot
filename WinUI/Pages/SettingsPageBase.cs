@@ -223,7 +223,7 @@ namespace DnsPilot.Pages
                 IsOpen = true,
                 IsClosable = true,
                 Severity = InfoBarSeverity.Error,
-                Title = "Zapret açılamadı",
+                Title = "Erişim açılamadı",
                 Message = AppController.Clip(error, 900),
                 Margin = new Thickness(0, 4, 0, 0),
             };

@@ -7,24 +7,29 @@ using System.Text.Json.Nodes;
 
 namespace DnsDegistirici
 {
-    // Discord masaüstü güncelleyicisi (Rust, native-tls/schannel) yalnızca TLS 1.2 konuşur. TLS 1.2'de sunucu
-    // sertifikası şifresiz gider; ISS'nin DPI'ı site adını okuyamadığı (bölünmüş) bağlantılarda sertifikaya bakıp keser,
-    // okuyabildiğinde zaten adı engeller. Sürücü olmadan (yalnızca giden veriyi biçimlendirerek) bu bağlantı geçirilemez:
-    // tüm bölme noktaları, TCP parçalama, OOB ve pencere küçültme denendi. Sonunda nokta olan ad DPI'dan geçer ama
-    // schannel sertifika adını reddeder (CERT_E_CN_NO_MATCH).
+    // Discord masaüstü uyumluluğu (yalnızca sürücüsüz erişim açıkken).
     //
-    // Güncelleme kontrolü başarısız olunca Discord sonsuza dek yeniden dener ve açılmaz. Discord'un kendi "fail open"
-    // ayarı (DESKTOP_TTI_UPDATE_CHECK_DEADLINE_MS) açılırsa, kontrol bu süre içinde başarılı olmadığında son başarılı
-    // güncellemedeki modüllerle açılır. Asıl Discord istemcisi discord.com'dan (TLS 1.3) yüklendiği için güncel kalır;
-    // yalnızca yerel modül güncellemeleri ertelenir. Ayar güvenlik açısından zararsızdır, DNS Pilot olmadan da bir şeyi
-    // bozmaz. Yalnızca bu anahtar yazılır; erişim kapatılınca (değer hâlâ bizimkiyse) silinir.
+    // Discord'un güncelleyicisi (Rust, native-tls/schannel) yalnızca TLS 1.2 konuşur. TLS 1.2'de sunucu sertifikası
+    // şifresiz gider; ISS'nin DPI'ı site adını okuyamadığı (bölünmüş) bağlantılarda sertifikaya bakıp keser, okuyabildiğinde
+    // adı engeller. Giden veriyi biçimlendirerek geçirilemez (bölme noktaları, TCP parçalama, OOB, pencere küçültme, diğer
+    // Cloudflare portları denendi; sonunda nokta olan adı schannel reddeder).
+    //
+    // 1) Güncelleme adresi (NEW_UPDATE_ENDPOINT) uygulamanın yerel aktarıcısına çevrilir (Bypass.UpdateRelayUrl,
+    //    127.88.0.1:33080). Aktarıcı isteği updates.discord.com'a TLS 1.3 ile iletir; güncellemeler normal şekilde iner.
+    // 2) Güvenlik ağı: Discord'un kendi "fail open" ayarı (DESKTOP_TTI_UPDATE_CHECK_DEADLINE_MS). Aktarıcıya ulaşılamazsa
+    //    Discord bu sürenin sonunda yüklü sürümle açılır, sonsuza dek "Discord Updater" ekranında beklemez.
+    //
+    // Erişim kapatılınca ya da uygulama kapanırken (değerler hâlâ bizimkiyse) ikisi de silinir. Uygulama çöker ya da
+    // Store'dan kaldırılırsa adres kalabilir; o durumda güncelleme denetimi başarısız olur ama 2. madde sayesinde Discord
+    // açılmaya devam eder; DNS Pilot bir sonraki açılışında ayarı düzeltir.
     public static class DiscordFix
     {
         public const string Key = "DESKTOP_TTI_UPDATE_CHECK_DEADLINE_MS";
-        // Güncelleme denetimi bu yolla ~50 ms içinde başarısız olur; 3 sn Discord'un açılışını gereksiz geciktirmez.
+        // Güncelleme denetimi başarısız olursa bu yolda ~50 ms içinde olur; 3 sn Discord'un açılışını gereksiz geciktirmez.
         public const int Value = 3000;
         const int OldValue = 8000; // 2.2.0 ilk sürümü
-        const string OldEndpointKey = "NEW_UPDATE_ENDPOINT", OldEndpointValue = "https://updates.discord.com./"; // 2.2.0 test sürümünden
+        public const string EndpointKey = "NEW_UPDATE_ENDPOINT";
+        const string OldEndpointValue = "https://updates.discord.com./"; // 2.2.0 test sürümünden
 
         static IEnumerable<string> SettingsFiles()
         {
@@ -36,7 +41,12 @@ namespace DnsDegistirici
             }
         }
 
-        // Ayar yoksa ya da kapalıysa (0) yazar; kullanıcının kendi değerine dokunmaz. Değişen dosya sayısı.
+        static bool OurEndpoint(string v) => v == Bypass.UpdateRelayUrl || v == OldEndpointValue;
+        static bool DefaultEndpoint(string v) => v == null || v.TrimEnd('/') == "https://updates.discord.com";
+
+        static string Str(JsonNode n) => n is JsonValue v && v.TryGetValue(out string s) ? s : null;
+
+        // Ayarlar yoksa (ya da varsayılan / eski değerimizse) yazar; kullanıcının kendi değerine dokunmaz.
         public static int Ensure(Action<string> log)
         {
             int changed = 0;
@@ -46,7 +56,13 @@ namespace DnsDegistirici
                 {
                     var obj = Read(f);
                     if (obj == null) continue;
-                    bool dirty = RemoveOldEndpoint(obj);
+                    bool dirty = false;
+                    string ep = Str(obj[EndpointKey]);
+                    if ((DefaultEndpoint(ep) || ep == OldEndpointValue) && ep != Bypass.UpdateRelayUrl)
+                    {
+                        obj[EndpointKey] = Bypass.UpdateRelayUrl;
+                        dirty = true;
+                    }
                     int? cur = Number(obj[Key]);
                     if (cur == null || cur.Value <= 0 || cur.Value == OldValue) { obj[Key] = Value; dirty = true; }
                     if (!dirty) continue;
@@ -59,7 +75,8 @@ namespace DnsDegistirici
             return changed;
         }
 
-        public static void Remove(Action<string> log)
+        // keepDeadline: uygulama kapanırken yalnızca aktarıcı adresi geri alınır (aktarıcı artık yok), fail-open kalır.
+        public static void Remove(Action<string> log, bool keepDeadline = false)
         {
             foreach (var f in SettingsFiles())
             {
@@ -67,9 +84,10 @@ namespace DnsDegistirici
                 {
                     var obj = Read(f);
                     if (obj == null) continue;
-                    bool dirty = RemoveOldEndpoint(obj);
+                    bool dirty = false;
+                    if (OurEndpoint(Str(obj[EndpointKey]))) { obj.Remove(EndpointKey); dirty = true; }
                     int? v = Number(obj[Key]);
-                    if (v == Value || v == OldValue) { obj.Remove(Key); dirty = true; }
+                    if (!keepDeadline && (v == Value || v == OldValue)) { obj.Remove(Key); dirty = true; }
                     if (!dirty) continue;
                     Write(f, obj);
                     log?.Invoke("Discord güncelleme ayarı geri alındı: " + f);
@@ -122,16 +140,6 @@ namespace DnsDegistirici
                 try { debounce?.Dispose(); } catch (Exception) { }
                 debounce = null;
             }
-        }
-
-        static bool RemoveOldEndpoint(JsonObject obj)
-        {
-            if (obj[OldEndpointKey] is JsonValue v && v.TryGetValue(out string s) && s == OldEndpointValue)
-            {
-                obj.Remove(OldEndpointKey);
-                return true;
-            }
-            return false;
         }
 
         static int? Number(JsonNode n)

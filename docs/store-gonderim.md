@@ -31,5 +31,7 @@ Sertifikasyon raporu (16.11.2026) üç madde içeriyordu. 2.2.0 hepsini ele alı
 
 - Test paketi: `msix\build-msix.ps1 -TestName DNSPilot.Test -TestPublisher "CN=DNSPilotTest" -CertThumbprint <parmak izi> -TestRevision <n>` (aynı sürümü yeniden kurabilmek için `-TestRevision` son haneyi artırır).
 - 26.11.2026'da Türk Telekom bağlantısında, Zapret kapalıyken doğrulandı: discord.com, gateway (WebSocket), cdn, media, updates; Discord masaüstü açıldı ve oturum kurdu (`[GatewaySocket] [READY]`); 119 MB indirmede doğrudan bağlantıyla aynı hız.
-- Sesli kanal test edilmedi (kullanıcının hesabıyla kanala girilmedi). Ses UDP ile sunucunun bildirdiği IP'ye gider ve bu yola uğramaz; Zapret de yalnızca TCP 443'ü işliyordu.
+- Sesli kanal: ses sunucusunun kontrol bağlantısı 2083 portundan açılır (dinleyici Cloudflare HTTPS portlarını da kabul eder); kanal `RTC_CONNECTED` oldu. Ses verisi UDP ile doğrudan gider.
+- Discord güncellemeleri: güncelleme adresi yerel aktarıcıya (`127.88.0.1:33080`) çevrilir; 26.11.2026'da manifest alındı, `discord_media` ve `discord_clips` modülleri kuruldu.
+- Kıyaslama (aynı hat, Zapret "Vodafone" ile): bağlantı başarısı %100 / %84, Discord API ilk bayt 77 / 95 ms, soğuk DNS 2–4 / 35–51 ms, boşta işlemci 0 / ~%17 çekirdek.
 - Ayrıntılı bağlantı kaydı için uygulamanın `ayarlar.txt` dosyasına `erisim.kayit=1` ekleyin; kayıt `%TEMP%\DnsPilot-kayit.txt`.

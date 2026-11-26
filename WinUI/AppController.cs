@@ -380,7 +380,7 @@ namespace DnsPilot
             {
                 try
                 {
-                    if (Bypass.Running) Bypass.Stop();
+                    if (Bypass.Running) { Bypass.Stop(); DiscordFix.StopWatching(); DiscordFix.Remove(m => Diag.Log("erişim: " + m), keepDeadline: true); }
                     Zapret.Stop();
                     RestoreSavedDns();
                 }

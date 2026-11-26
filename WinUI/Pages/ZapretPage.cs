@@ -60,7 +60,7 @@ namespace DnsPilot.Pages
                         App.AccessMethodChanged();
                     }, true, 280)));
                 s.Children.Add(Card("\uE8BD", "Discord uyumluluğu",
-                    "Discord masaüstü uygulamasının güncelleme denetimi bu yöntemle tamamlanamaz. Bu seçenek, Discord'un kendi \"güncelleme denetimi başarısızsa yine de aç\" ayarını etkinleştirir; Discord birkaç saniye sonra açılır. Erişim kapatılınca ayar geri alınır.",
+                    "Discord masaüstü uygulamasının güncellemeleri DNS Pilot üzerinden indirilir (Discord'un güncelleme adresi bu bilgisayardaki aktarıcıya yönlendirilir). Aktarıcıya ulaşılamazsa Discord birkaç saniye bekleyip yüklü sürümle açılır. Erişim kapatılınca ayarlar geri alınır.",
                     Toggle(AppController.DiscordCompat, App.SetDiscordCompat)));
             }
             else

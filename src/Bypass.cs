@@ -64,6 +64,8 @@ namespace DnsDegistirici
                 // 443 ve 80 zorunlu, diğerleri açılamazsa atlanır.
                 foreach (int p in TlsPorts) { int port = p; ListenOptional(port, port == 443, (s, c) => HandleTls(s, port, c)); }
                 foreach (int p in HttpPorts) { int port = p; ListenOptional(port, port == 80, (s, c) => HandleHttp(s, port, c)); }
+                // Discord güncelleyicisi için yerel aktarıcı (bkz. HandleUpdateRelay). Açılamazsa güncelleme yine fail-open ile atlanır.
+                ListenOptional(UpdateRelayPort, false, HandleUpdateRelay);
             }
             catch (Exception ex)
             {
@@ -286,6 +288,132 @@ namespace DnsDegistirici
                 try { up?.Dispose(); } catch { }
                 Interlocked.Decrement(ref active);
             }
+        }
+
+        // ---- Discord güncelleme aktarıcısı (127.88.0.1:33080) ----
+        // Discord'un güncelleyicisi (Rust, native-tls) yalnızca TLS 1.2 konuşur; TLS 1.2'de sunucu sertifikası şifresiz
+        // gittiğinden DPI, site adını göremediği bağlantıda sertifikadan tanıyıp keser (tüm portlarda; bölme, OOB, pencere
+        // küçültme, sonda nokta denendi). Güncelleme adresi (NEW_UPDATE_ENDPOINT) bu yerel adrese çevrilir; istek burada
+        // alınıp updates.discord.com'a uygulamanın kendi bağlantısıyla (TLS 1.3, sertifika doğrulanır, ClientHello bölünür)
+        // iletilir. Yalnızca bu tek sunucuya gidilir (açık proxy değildir); şifresiz kısım bilgisayarın içinde kalır.
+        // Manifestteki paketler dl2.discordapp.net'ten (engelli değil) doğrudan iner.
+        public const int UpdateRelayPort = 33080;
+        public static string UpdateRelayUrl => "http://" + ListenIp + ":" + UpdateRelayPort + "/";
+        const string UpdateHost = "updates.discord.com";
+
+        static readonly HttpClient relayHttp = new HttpClient(new SocketsHttpHandler
+        {
+            ConnectTimeout = TimeSpan.FromSeconds(6),
+            PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+            AutomaticDecompression = DecompressionMethods.None, // gzip vb. olduğu gibi aktarılır
+            AllowAutoRedirect = false,
+            UseProxy = false,
+            ConnectCallback = async (ctx, ct) =>
+            {
+                // Sistem çözücüsü kullanılamaz (NRPT bu adı bize yönlendirir); gerçek adres DoH ile bulunur.
+                var ips = await Doh.ResolveA(ctx.DnsEndPoint.Host, ct);
+                foreach (var ip in ips.Take(3))
+                {
+                    var s = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
+                    try
+                    {
+                        using (var c = CancellationTokenSource.CreateLinkedTokenSource(ct))
+                        {
+                            c.CancelAfter(5000);
+                            await s.ConnectAsync(ip, ctx.DnsEndPoint.Port, c.Token);
+                        }
+                        return new Doh.SplitFirstWrite(new NetworkStream(s, true), s);
+                    }
+                    catch { s.Dispose(); }
+                }
+                throw new HttpRequestException("updates.discord.com bağlanamadı");
+            },
+        }) { Timeout = TimeSpan.FromSeconds(30) };
+
+        async Task HandleUpdateRelay(Socket client, CancellationToken ct)
+        {
+            try
+            {
+                client.NoDelay = true;
+                using (var cs = new NetworkStream(client, true))
+                {
+                    while (!ct.IsCancellationRequested)
+                    {
+                        // İstek başlığı
+                        var head = new MemoryStream();
+                        var one = new byte[1];
+                        int matched = 0;
+                        while (matched < 4)
+                        {
+                            int r = await cs.ReadAsync(one, 0, 1, ct);
+                            if (r <= 0) return;
+                            head.WriteByte(one[0]);
+                            matched = (one[0] == (matched % 2 == 0 ? '\r' : '\n')) ? matched + 1 : (one[0] == '\r' ? 1 : 0);
+                            if (head.Length > 65536) return;
+                        }
+                        var lines = Encoding.ASCII.GetString(head.ToArray()).Split(new[] { "\r\n" }, StringSplitOptions.None);
+                        var first = lines[0].Split(' ');
+                        if (first.Length < 3 || !first[1].StartsWith("/")) return;
+                        var headers = new List<KeyValuePair<string, string>>();
+                        long contentLength = 0;
+                        bool keepAlive = !first[2].EndsWith("1.0");
+                        foreach (var l in lines.Skip(1))
+                        {
+                            int c = l.IndexOf(':');
+                            if (c <= 0) continue;
+                            string k = l.Substring(0, c).Trim(), v = l.Substring(c + 1).Trim();
+                            if (k.Equals("Content-Length", StringComparison.OrdinalIgnoreCase)) long.TryParse(v, out contentLength);
+                            else if (k.Equals("Connection", StringComparison.OrdinalIgnoreCase)) keepAlive = !v.Equals("close", StringComparison.OrdinalIgnoreCase);
+                            else if (!k.Equals("Host", StringComparison.OrdinalIgnoreCase) && !k.StartsWith("Proxy-", StringComparison.OrdinalIgnoreCase)
+                                     && !k.Equals("Transfer-Encoding", StringComparison.OrdinalIgnoreCase)) headers.Add(new KeyValuePair<string, string>(k, v));
+                        }
+                        byte[] body = null;
+                        if (contentLength > 0)
+                        {
+                            if (contentLength > 16 * 1024 * 1024) return;
+                            body = new byte[contentLength];
+                            if (!await ReadExact(cs, body, (int)contentLength, ct)) return;
+                        }
+
+                        var req = new HttpRequestMessage(new HttpMethod(first[0]), "https://" + UpdateHost + first[1]);
+                        if (body != null) req.Content = new ByteArrayContent(body);
+                        foreach (var h in headers)
+                            if (!req.Headers.TryAddWithoutValidation(h.Key, h.Value) && req.Content != null)
+                                req.Content.Headers.TryAddWithoutValidation(h.Key, h.Value);
+
+                        byte[] resBody; string status; var resHeaders = new StringBuilder();
+                        try
+                        {
+                            using (var res = await relayHttp.SendAsync(req, ct))
+                            {
+                                resBody = await res.Content.ReadAsByteArrayAsync(ct);
+                                status = (int)res.StatusCode + " " + res.ReasonPhrase;
+                                foreach (var h in res.Headers.Concat(res.Content.Headers))
+                                {
+                                    if (h.Key.Equals("Transfer-Encoding", StringComparison.OrdinalIgnoreCase) || h.Key.Equals("Connection", StringComparison.OrdinalIgnoreCase)
+                                        || h.Key.Equals("Content-Length", StringComparison.OrdinalIgnoreCase) || h.Key.Equals("Keep-Alive", StringComparison.OrdinalIgnoreCase)) continue;
+                                    foreach (var v in h.Value) resHeaders.Append(h.Key).Append(": ").Append(v).Append("\r\n");
+                                }
+                            }
+                            if (Verbose) Log("güncelleme aktarıcısı: " + first[0] + " " + first[1].Split('?')[0] + " → " + status);
+                        }
+                        catch (Exception ex)
+                        {
+                            Log("güncelleme aktarıcısı: " + ex.GetType().Name + " " + ex.Message);
+                            resBody = Encoding.UTF8.GetBytes("upstream error");
+                            status = "502 Bad Gateway";
+                            resHeaders.Append("Content-Type: text/plain\r\n");
+                        }
+                        var hdr = "HTTP/1.1 " + status + "\r\n" + resHeaders + "Content-Length: " + resBody.Length + "\r\n" +
+                                  (keepAlive ? "" : "Connection: close\r\n") + "\r\n";
+                        await cs.WriteAsync(Encoding.ASCII.GetBytes(hdr), ct);
+                        await cs.WriteAsync(resBody, ct);
+                        if (!keepAlive) return;
+                    }
+                }
+            }
+            catch { }
+            finally { try { client.Dispose(); } catch { } }
         }
 
         // ---- Düz HTTP (80): Host başlığına göre ilet ----
@@ -643,7 +771,7 @@ namespace DnsDegistirici
         }
 
         // İlk yazılan TLS kaydını (ClientHello) bölerek gönderen akış.
-        sealed class SplitFirstWrite : Stream
+        internal sealed class SplitFirstWrite : Stream
         {
             readonly NetworkStream inner; readonly Socket sock; bool first = true;
             public SplitFirstWrite(NetworkStream inner, Socket sock) { this.inner = inner; this.sock = sock; }

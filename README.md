@@ -89,7 +89,7 @@ Varsayılan erişim yöntemi artık sürücü kurmaz; Microsoft Store sürümü 
 
 - Windows'un ad çözümleme ilkesine (NRPT) geçici bir kural eklenir: yalnızca site listesindeki adlar (discord.com …) uygulamanın yerel DNS'ine (`127.88.0.1`) sorulur, diğer her şey eskisi gibi çözülür. Kural yeniden başlatınca kendiliğinden silinir.
 - Bu adlara açılan bağlantılar `127.88.0.1:443`'e gelir; uygulama site adını okuyup gerçek sunucuya doğrudan bağlanır ve yalnızca ilk paketi (TLS ClientHello) iki TLS kaydına bölerek gönderir. Şifre çözülmez, trafik uzak bir sunucudan dolaşmaz, **ping değişmez**. Discord sesi (UDP) bu yola hiç uğramaz.
-- Discord masaüstü güncelleyicisi yalnızca TLS 1.2 konuştuğu için bu yolla geçemez; **Discord uyumluluğu** seçeneği Discord'un kendi "güncelleme denetimi başarısızsa yine de aç" ayarını açar (Discord birkaç saniye sonra açılır, istemcinin kendisi discord.com'dan güncel yüklenir).
+- Discord masaüstü güncelleyicisi yalnızca TLS 1.2 konuşur; TLS 1.2'de sunucu sertifikası şifresiz gittiği için DPI onu tanıyıp keser. **Discord uyumluluğu** seçeneği Discord'un güncelleme adresini bu bilgisayardaki aktarıcıya (`http://127.88.0.1:33080/`) çevirir; aktarıcı isteği `updates.discord.com`'a TLS 1.3 ile iletir, güncellemeler normal şekilde iner. Aktarıcıya ulaşılamazsa Discord'un "güncelleme denetimi başarısızsa yine de aç" ayarı sayesinde Discord birkaç saniye sonra yüklü sürümle açılır.
 
 > [!TIP]
 > Zapret kullanıyorsanız ve hangi stratejinin size uygun olduğunu bilmiyorsanız **Ayarlar → Erişim → En uygun stratejiyi bul**'u kullanın. Yaklaşık bir dakika içinde bağlantınızda en iyi çalışanı seçer.

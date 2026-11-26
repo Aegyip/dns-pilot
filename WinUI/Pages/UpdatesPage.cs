@@ -53,55 +53,18 @@ namespace DnsPilot.Pages
         {
             if (Settings.Packaged)
             {
-                s.Children.Add(Hero("", false, "Güncellemeler Microsoft Store'dan gelir",
-                    "DNS Pilot ve Zapret motoru birlikte güncellenir. Yeni sürümler Microsoft Store tarafından otomatik olarak yüklenir.",
+                s.Children.Add(Hero("\uE895", false, "Güncellemeler Microsoft Store'dan gelir",
+                    "Yeni sürümler Microsoft Store tarafından otomatik olarak yüklenir.",
                     Btn("Store'u aç", () => OpenUri("ms-windows-store://downloadsandupdates"), true, true)));
-                Section(s, "Bileşenler");
-                s.Children.Add(Card("", "DNS Pilot", "Sürüm " + AppVersion));
-                s.Children.Add(Card("", "Zapret motoru", "Sürüm " + AppController.ShortSha(App.State.ZapretVersion) +
-                    " · Kaynak: bol-van/zapret-win-bundle · Uygulamayla birlikte gelir"));
-                return;
             }
-
-            var u = App.Updates;
-            string last = u.LastCheck.HasValue ? "Son denetim: " + UpdateState.FormatWhen(u.LastCheck.Value) : "Henüz denetim yapılmadı";
-
-            if (u.Installing)
-                s.Children.Add(Hero("", false, "Güncelleme yükleniyor…",
-                    "Zapret motoru indiriliyor ve kuruluyor. Bu sırada Zapret kısa bir süre devre dışı kalabilir.", null, true));
-            else if (u.Checking)
-                s.Children.Add(Hero("", false, "Güncellemeler denetleniyor…", "Bu işlem birkaç saniye sürebilir.", null, true));
-            else if (u.ZapretAvailable)
-                s.Children.Add(Hero("", false, "Güncellemeler kullanılabilir", last, Btn("Şimdi yükle", App.InstallUpdates, !u.Installing, true)));
-            else if (u.LastCheck.HasValue && u.Error == null)
-                s.Children.Add(Hero("", true, "Güncelsiniz", last, Btn("Güncellemeleri denetle", App.CheckUpdates, true, true)));
             else
-                s.Children.Add(Hero("", false, "Güncellemeleri denetleyin", last, Btn("Güncellemeleri denetle", App.CheckUpdates, true, true)));
-
-            if (u.Error != null)
-                s.Children.Add(new InfoBar { IsOpen = true, IsClosable = false, Severity = InfoBarSeverity.Error, Title = "İşlem tamamlanamadı", Message = u.Error, Margin = new Thickness(0, 4, 0, 0) });
-            else if (u.Message != null)
-                s.Children.Add(new InfoBar { IsOpen = true, IsClosable = false, Severity = InfoBarSeverity.Success, Title = "Güncelleme tamamlandı", Message = u.Message, Margin = new Thickness(0, 4, 0, 0) });
-
-            if (u.ZapretAvailable || u.Installing)
-                s.Children.Add(Card("", "Zapret motoru güncellemesi",
-                    "Sürüm " + AppController.ShortSha(u.ZapretCurrent) + " → " + AppController.ShortSha(u.ZapretLatest) +
-                    " · Site listeleriniz ve strateji ayarlarınız korunur.",
-                    Badge(u.Installing ? "Yükleniyor…" : "Yüklemeye hazır", false)));
-
+            {
+                s.Children.Add(Hero("\uE895", false, "Yeni sürümler GitHub'da yayımlanır",
+                    "Bu kopya klasik kurulumla yüklendi. Yeni sürümü sürüm notları sayfasından indirebilir ya da Microsoft Store sürümüne geçerek otomatik güncelleme alabilirsiniz.",
+                    Btn("Sürüm notları", () => OpenUri(BugReport.RepoUrl + "/releases"), true, true)));
+            }
             Section(s, "Bileşenler");
-            s.Children.Add(Card("", "DNS Pilot",
-                "Sürüm " + AppVersion + " · Uygulama güncellemeleri Microsoft Store tarafından otomatik olarak sunulur.",
-                Btn("Microsoft Store", () => OpenUri("ms-windows-store://downloadsandupdates"))));
-            s.Children.Add(Card("", "Zapret motoru",
-                "Sürüm " + AppController.ShortSha(u.ZapretCurrent) + " · Kaynak: bol-van/zapret-win-bundle",
-                u.ZapretAvailable ? (object)Badge("Yeni sürüm: " + AppController.ShortSha(u.ZapretLatest), false)
-                : u.LastCheck.HasValue ? Badge("✓ Güncel", true) : null));
-
-            Section(s, "Seçenekler");
-            s.Children.Add(Card("", "Güncellemeleri otomatik denetle",
-                "Uygulama başlatıldığında günde en fazla bir kez yeni sürümleri denetler ve kullanılabilir olduğunda bildirim gösterir.",
-                Toggle(u.AutoCheck, v => Settings.Set("guncelleme.otomatik", v ? "1" : "0"))));
+            s.Children.Add(Card("\uE71D", "DNS Pilot", "Sürüm " + AppVersion));
         }
     }
 }

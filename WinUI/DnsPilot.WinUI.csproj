@@ -1,9 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
     DNS Pilot — WinUI 3 (Windows App SDK) arayüzü.
-    DNS, Zapret, strateji testi ve güncelleme mantığı ..\src altındaki dosyalardan bağlanır (link).
-    Çıktı bin\winui\ klasörüne gider; zapret motoru ve kullanıcı
-    dosyaları bir üstteki bin\ klasöründe aranır (src\Zapret.cs: Settings.ResolveInstallDir).
+    DNS, erişim ve ayar mantığı ..\src altındaki dosyalardan bağlanır (link).
+    Çıktı bin\winui\ klasörüne gider; kullanıcı dosyaları bir üstteki bin\ klasöründe aranır
+    (src\Settings.cs: Settings.ResolveInstallDir).
   -->
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -14,7 +14,7 @@
     <AssemblyName>DnsPilot</AssemblyName>
     <AssemblyTitle>DNS Pilot</AssemblyTitle>
     <Product>DNS Pilot</Product>
-    <Version>2.2.0</Version>
+    <Version>3.0.0</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>..\src\app.ico</ApplicationIcon>
     <Platforms>x64</Platforms>
@@ -39,14 +39,13 @@
 
   <ItemGroup>
     <Compile Include="..\src\Dns.cs" Link="Shared\Dns.cs" />
-    <Compile Include="..\src\Zapret.cs" Link="Shared\Zapret.cs" />
-    <Compile Include="..\src\StrategyTest.cs" Link="Shared\StrategyTest.cs" />
-    <Compile Include="..\src\Updates.cs" Link="Shared\Updates.cs" />
+    <Compile Include="..\src\Settings.cs" Link="Shared\Settings.cs" />
+    <Compile Include="..\src\SiteList.cs" Link="Shared\SiteList.cs" />
+    <Compile Include="..\src\LegacyCleanup.cs" Link="Shared\LegacyCleanup.cs" />
     <Compile Include="..\src\Shortcut.cs" Link="Shared\Shortcut.cs" />
     <Compile Include="..\src\BugReport.cs" Link="Shared\BugReport.cs" />
     <Compile Include="..\src\Diag.cs" Link="Shared\Diag.cs" />
     <Compile Include="..\src\ProcessRunner.cs" Link="Shared\ProcessRunner.cs" />
-    <Compile Include="..\src\ChildJob.cs" Link="Shared\ChildJob.cs" />
     <Compile Include="..\src\Bypass.cs" Link="Shared\Bypass.cs" />
     <Compile Include="..\src\DiscordFix.cs" Link="Shared\DiscordFix.cs" />
   </ItemGroup>

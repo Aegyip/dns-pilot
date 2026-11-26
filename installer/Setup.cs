@@ -15,7 +15,7 @@ using Microsoft.Win32;
 //   setup.exe                 → kurar (onay sorar, sonunda uygulamayı açar)
 //   setup.exe /S              → sessiz kurulum (Microsoft Store bunu kullanır)
 //   setup.exe /uninstall [/S] → kaldırır
-// Zapret motoru da kurulumla gelir (zapret\motor); ilk açılışta Zapret hemen kullanılabilir.
+// 3.0 sürücü kurmaz; 2.x'ten kalan Zapret motorunu uygulama ilk açılışta temizler (src\LegacyCleanup.cs).
 static class Setup
 {
     const string AppName = "DNS Pilot";
@@ -67,12 +67,12 @@ static class Setup
             return 1602; // ERROR_INSTALL_USEREXIT
 
         StopApp();
-        // Zapret çalıştıysa WinDivert sürücüsü yüklü kalır ve WinDivert64.sys kilitlidir; üzerine yazılabilmesi için durdurulur.
+        // 2.x'ten yükseltme: Zapret çalıştıysa WinDivert sürücüsü yüklü kalır; eski motor klasörü silinebilsin diye durdurulur.
         Run("sc.exe", "stop windivert");
         Directory.CreateDirectory(InstallDir);
         string exe = Path.Combine(InstallDir, ExeName);
         Extract(InstallDir);
-        // 1.x sürümünden yükseltme: eski tek dosyalık exe kaldırılır (ayarlar, profiller ve zapret dosyaları korunur).
+        // 1.x sürümünden yükseltme: eski tek dosyalık exe kaldırılır (ayarlar ve profiller korunur).
         try { File.Delete(Path.Combine(InstallDir, OldExeName)); } catch (Exception) { }
 
         // Kaldırma için kurucunun kendisini kurulum klasörüne kopyala.
@@ -108,7 +108,7 @@ static class Setup
     static int Uninstall(bool silent)
     {
         if (!silent && MessageBox.Show(AppName + " kaldırılsın mı? Ayarlarınız ve DNS profilleriniz de silinecek.\n\n" +
-                "DNS Pilot'un yaptığı DNS ayarı geri alınır (Zapret öncesi ayarınıza ya da otomatik ayara dönülür).",
+                "DNS Pilot'un yaptığı DNS ayarı geri alınır (önceki ayarınıza ya da otomatik ayara dönülür).",
                 AppName + " Kaldır", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
             return 1602;
 
@@ -141,7 +141,7 @@ static class Setup
     }
 
     // Gömülü app.zip'i kurulum klasörüne açar. Var olan uygulama dosyalarının üzerine yazılır;
-    // kullanıcı dosyaları (ayarlar.txt, profiles.txt, zapret\) zip'te olmadığı için dokunulmaz.
+    // kullanıcı dosyaları (ayarlar.txt, profiles.txt, siteler.txt) zip'te olmadığı için dokunulmaz.
     static void Extract(string dir)
     {
         using (var res = Assembly.GetExecutingAssembly().GetManifestResourceStream("app.zip"))

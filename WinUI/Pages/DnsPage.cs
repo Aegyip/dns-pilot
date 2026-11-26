@@ -46,9 +46,6 @@ namespace DnsPilot.Pages
                 "Önerilir. Kapalıyken şifreli DNS sunucusuna ulaşılamadığı anda (ör. servis sağlayıcı engellediğinde) siteler açılmaz " +
                 "veya çok yavaş açılır. Açıkken Windows bu durumda geçici olarak şifresiz DNS kullanır.",
                 Toggle(DnsManager.UdpFallback, App.SetUdpFallback)));
-            s.Children.Add(Card("\uE7A7", "Zapret durunca önceki DNS ayarına dön",
-                "Zapret açılırken şifreli DNS'e geçildiyse, Zapret durdurulduğunda veya uygulamadan çıkıldığında önceki DNS ayarınız geri yüklenir.",
-                Toggle(AppController.RestoreDnsOnStop, v => Settings.Set("dns.geri_al", v ? "1" : "0"))));
 
             Section(s, "Gelişmiş");
             s.Children.Add(Link("\uE70F", "DNS profillerini düzenle",

@@ -37,19 +37,19 @@ namespace DnsPilot.Pages
                 "Oturum açtığınızda uygulama, yönetici onayı istemeden bildirim alanında başlar.",
                 Toggle(App.AutostartEnabled == true, App.SetAutostart, App.AutostartEnabled.HasValue)));
             s.Children.Add(Link("", "Uygulama klasörünü aç",
-                "DNS profillerinin, ayarların ve Zapret dosyalarının bulunduğu klasörü Dosya Gezgini'nde açar.",
+                "DNS profillerinin, ayarların ve site listesinin bulunduğu klasörü Dosya Gezgini'nde açar.",
                 () => Process.Start(new ProcessStartInfo("explorer.exe", "\"" + Settings.AppDir + "\"") { UseShellExecute = false })));
 
             Section(s, "Hakkında");
             s.Children.Add(Card("", "DNS Pilot",
-                "Sürüm " + AppVersion + " · Zapret motoru " + AppController.ShortSha(App.State.ZapretVersion)));
+                "Sürüm " + AppVersion));
 
             Section(s, "Destek");
             s.Children.Add(Card("\uEBE8", "Hata bildir",
-                "GitHub'da hazır doldurulmuş bir hata bildirimi açar. Uygulama sürümü, Windows sürümü ve Zapret durumu eklenir; göndermeden önce her şeyi görüp düzenleyebilirsiniz.",
+                "GitHub'da hazır doldurulmuş bir hata bildirimi açar. Uygulama sürümü, Windows sürümü ve erişim durumu eklenir; göndermeden önce her şeyi görüp düzenleyebilirsiniz.",
                 Btn("Hata bildir", BugReport.Open, true, true)));
             s.Children.Add(Card("", "Tanılama bilgilerini kopyala",
-                copied ?? "DNS ve Zapret durumu, ayarlar ve son işlem kayıtları panoya kopyalanır. Hata bildiriminin \"Ek bilgi\" alanına yapıştırın; " +
+                copied ?? "DNS ve erişim durumu, ayarlar ve son işlem kayıtları panoya kopyalanır. Hata bildiriminin \"Ek bilgi\" alanına yapıştırın; " +
                 "kullanıcı adınız ve klasör yollarınız çıkarılır.",
                 Btn("Kopyala", CopyDiagnostics)));
             s.Children.Add(Link("\uE943", "Kaynak kodu", "DNS Pilot açık kaynaklıdır. Kaynak kodu ve sürüm notları GitHub'da.", BugReport.OpenRepo));

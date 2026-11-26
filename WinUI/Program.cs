@@ -8,7 +8,7 @@ namespace DnsPilot
 {
     public static class Program
     {
-        // WinForms sürümüyle aynı adlar: ikisi aynı anda çalışıp zapret'i birbirinden kapatmasın.
+        // WinForms sürümüyle aynı adlar: ikisi aynı anda çalışıp ayarları birbirinden değiştirmesin.
         public const string MutexName = "DnsDegistirici_TekKopya";
         public const string ShowEventName = "DnsDegistirici_Goster";
 
@@ -55,13 +55,12 @@ namespace DnsPilot
             return 0;
         }
 
-        // Zapret'in kaydettiği önceki DNS varsa ona, yoksa DNS bu uygulamanın bir profilindeyse otomatik (DHCP) ayara döner.
+        // 2.x'te Zapret'in kaydettiği önceki DNS varsa ona, yoksa DNS bu uygulamanın bir profilindeyse otomatik (DHCP) ayara döner.
         // Kullanıcının kendi girdiği, profillerde olmayan bir DNS'e dokunulmaz.
         static int ResetDnsForUninstall()
         {
             try
             {
-                DnsDegistirici.Zapret.Stop();
                 string saved = DnsDegistirici.Settings.Get("zapret.onceki_dns", null);
                 string error;
                 if (saved != null) error = DnsDegistirici.DnsManager.Restore(saved);

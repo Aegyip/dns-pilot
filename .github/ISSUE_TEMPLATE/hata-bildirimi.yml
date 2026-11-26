@@ -13,7 +13,7 @@ body:
     attributes:
       label: Ne oldu?
       description: Sorunu kısaca anlatın.
-      placeholder: Örn. Zapret'i başlattığımda Discord açılmıyor.
+      placeholder: Örn. Erişimi açtığımda Discord açılmıyor.
     validations:
       required: true
   - type: textarea
@@ -22,7 +22,7 @@ body:
       label: Nasıl tekrarlanır?
       placeholder: |
         1. Tepsi menüsünü açtım
-        2. Zapret'i başlat'a tıkladım
+        2. Erişimi başlat'a tıkladım
         3. ...
     validations:
       required: true
@@ -46,15 +46,15 @@ body:
       label: Kurulum türü
       placeholder: Microsoft Store / klasik kurulum
   - type: input
-    id: zapret
+    id: erisim
     attributes:
-      label: Zapret durumu
-      description: Çalışıyor mu, hangi strateji seçili?
+      label: Erişim durumu
+      description: Etkin mi, hangi bölme biçimi seçili?
   - type: input
     id: isp
     attributes:
       label: İnternet servis sağlayıcınız (isteğe bağlı)
-      description: Strateji sorunlarında yardımcı olur.
+      description: Erişim sorunlarında yardımcı olur.
       placeholder: Örn. Türk Telekom, Superonline, Vodafone
   - type: textarea
     id: tanilama

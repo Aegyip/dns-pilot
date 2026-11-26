@@ -21,8 +21,7 @@ namespace DnsPilot.Pages
             var snap = App.State;
             var state = snap.Dns;
             bool accessOn = snap.AccessOn;
-            bool accessTarget = App.PendingZapret ?? accessOn;
-            var strategy = snap.Strategy;
+            bool accessTarget = App.PendingAccess ?? accessOn;
 
             string servers = state.Servers.Count == 0 ? "—" : string.Join(", ", state.Servers.Take(4));
             s.Children.Add(Card("\uE774", StatusText(state),
@@ -31,27 +30,10 @@ namespace DnsPilot.Pages
 
             s.Children.Add(Card("\uEA18", "Erişim",
                 accessTarget != accessOn ? (accessTarget ? "Başlatılıyor…" : "Durduruluyor…")
-                : snap.BypassRunning ? "Etkin · Discord gibi kısıtlanan hizmetlere sürücüsüz erişim"
-                : snap.ZapretRunning ? "Etkin · Zapret · " + (strategy != null ? strategy.Name : "Varsayılan") + " stratejisi"
+                : accessOn ? "Etkin · Discord gibi kısıtlanan hizmetlere sürücüsüz erişim"
                 : "Devre dışı · Erişim kısıtlamalarını aşmak için etkinleştirin",
                 Toggle(accessTarget, on => { if (on) App.StartAccess(); else App.StopAccess(); })));
-            ZapretErrorBar(s);
-
-            var u = App.Updates;
-            if (!Settings.Packaged && u.ZapretAvailable && !u.Installing)
-            {
-                var info = new InfoBar
-                {
-                    IsOpen = true,
-                    IsClosable = false,
-                    Severity = InfoBarSeverity.Informational,
-                    Title = "Güncelleme kullanılabilir",
-                    Message = "Zapret motorunun yeni bir sürümü yüklenmeye hazır.",
-                    ActionButton = Btn("Görüntüle", () => DnsPilot.App.Instance.ShowWindow("Güncellemeler")),
-                    Margin = new Thickness(0, 4, 0, 0),
-                };
-                s.Children.Add(info);
-            }
+            AccessErrorBar(s);
 
             Section(s, "Araçlar");
             s.Children.Add(Link("\uE916", "DNS hız testi", "Kayıtlı DNS sunucularının yanıt sürelerini ölçer ve karşılaştırır.",

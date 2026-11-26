@@ -53,7 +53,7 @@ namespace DnsPilot
         {
             try
             {
-                icon.ForceCreate(false); // verimlilik kipi kapalı: zapret/DNS işleri yavaşlatılmasın
+                icon.ForceCreate(false); // verimlilik kipi kapalı: erişim/DNS işleri yavaşlatılmasın
                 created = true;
                 RefreshIcon();
             }
@@ -79,9 +79,8 @@ namespace DnsPilot
             var items = new List<TrayMenuHost.Entry>();
             var s = app.State;
             var state = s.Dns;
-            bool zapretOn = app.PendingZapret ?? s.AccessOn;
+            bool accessOn = app.PendingAccess ?? s.AccessOn;
             string pendingDns = app.PendingDns;
-            var strategy = s.Strategy;
 
             if (!AppController.Elevated)
             {
@@ -94,8 +93,7 @@ namespace DnsPilot
             items.Add(new TrayMenuHost.Item { Text = state.Summary, Glyph = "", Enabled = false });
             items.Add(new TrayMenuHost.Item
             {
-                Text = s.BypassRunning ? "Erişim: etkin · sürücüsüz"
-                     : s.ZapretRunning ? "Erişim: etkin · Zapret · " + (strategy != null ? strategy.Name : "?")
+                Text = s.AccessOn ? "Erişim: etkin"
                      : "Erişim: devre dışı",
                 Glyph = "",
                 Enabled = false
@@ -104,9 +102,9 @@ namespace DnsPilot
 
             items.Add(new TrayMenuHost.Item
             {
-                Text = zapretOn ? "Erişimi durdur" : "Erişimi başlat",
-                Glyph = zapretOn ? "" : "",
-                Action = () => { if (zapretOn) app.StopAccess(); else app.StartAccess(); }
+                Text = accessOn ? "Erişimi durdur" : "Erişimi başlat",
+                Glyph = accessOn ? "" : "",
+                Action = () => { if (accessOn) app.StopAccess(); else app.StartAccess(); }
             });
             items.Add(new TrayMenuHost.Separator());
 
@@ -147,17 +145,17 @@ namespace DnsPilot
             {
                 var s = app.State;
                 var state = s.Dns;
-                bool zapretOn = s.AccessOn;
+                bool accessOn = s.AccessOn;
                 Color color = !state.HasAdapter ? Color.FromArgb(220, 38, 38)   // kırmızı: bağlantı yok
                             : !state.IsStatic   ? Color.FromArgb(115, 115, 115) // gri: servis sağlayıcı DNS'i
                             : state.DohOn       ? Color.FromArgb(22, 163, 74)   // yeşil: şifreli
                             :                     Color.FromArgb(139, 92, 246); // mor: şifresiz özel
-                Color dot = zapretOn && state.HasAdapter ? Color.FromArgb(245, 158, 11) : color;
+                Color dot = accessOn && state.HasAdapter ? Color.FromArgb(245, 158, 11) : color;
                 if (lastDot != dot || currentHandle == IntPtr.Zero) DrawIcon(dot);
                 lastDot = dot;
 
                 string activity = app.Activity;
-                string tip = AppController.Clip(activity ?? state.Summary + (zapretOn ? " · Erişim" : ""), 63);
+                string tip = AppController.Clip(activity ?? state.Summary + (accessOn ? " · Erişim" : ""), 63);
                 if (tip != lastTip) icon.ToolTipText = tip;
                 lastTip = tip;
             }

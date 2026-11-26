@@ -1,10 +1,8 @@
 # MSIX paketini üretir: dist\DNSPilot.msix
 #   -Tools  : makeappx.exe ve signtool.exe'nin bulunduğu klasör (Windows SDK / Microsoft.Windows.SDK.BuildTools)
-#   -Engine : (isteğe bağlı) zapret motor klasörü; Store paketi motorsuz üretilir (winws2.exe, WinDivert.dll, WinDivert64.sys, cygwin1.dll, lua\ ...)
 #   -CertPfx: (isteğe bağlı) yerel test için imza sertifikası. Store'a gönderilecek paket imzasız kalır; Store imzalar.
 param(
     [Parameter(Mandatory = $true)][string]$Tools,
-    [string]$Engine,  # boş: motorsuz paket (Microsoft Store: sürücü içeren paket kabul edilmez)
     [string]$CertPfx,
     [string]$CertPassword,
     [string]$CertThumbprint,  # yerel test: kullanıcı deposundaki sertifikayla imzala
@@ -36,21 +34,9 @@ if ($TestName -and $TestPublisher) {
     if ($TestRevision -gt 0) { $x = [regex]::Replace($x, '(<Identity [^>]*Version="\d+\.\d+\.\d+\.)0"', ('${1}' + $TestRevision + '"')) }
     [IO.File]::WriteAllText($mf, $x, (New-Object Text.UTF8Encoding $false))
 }
-# Motor: yalnızca çalışması için gerekenler (cmd betikleri ve örnekler hariç).
-# Store paketi motorsuz üretilir: WinDivert sürücüsü Store politikası 10.2.4.2'ye takılır; uygulama sürücüsüz erişimi kullanır.
-if ($Engine) {
-    New-Item -ItemType Directory -Force "$layout\zapret\motor" | Out-Null
-    foreach ($f in 'winws2.exe', 'winws.exe', 'WinDivert.dll', 'WinDivert64.sys', 'cygwin1.dll', 'windivert.filter') {
-        $p = Join-Path $Engine $f
-        if (Test-Path $p) { Copy-Item $p "$layout\zapret\motor" -Recurse }
-    }
-    foreach ($d in 'lua', 'files') {
-        $p = Join-Path $Engine $d
-        if (Test-Path $p) { Copy-Item $p "$layout\zapret\motor" -Recurse }
-    }
-    $ver = Join-Path (Split-Path $Engine -Parent) 'surum.txt'
-    if (Test-Path $ver) { Copy-Item $ver "$layout\zapret\surum.txt" }
-}
+# Paket sürücü içermez (Store politikası 10.2.4.2). Eski bir yayımlama klasöründen kalmış olsa bile denetlenir.
+$bad = Get-ChildItem $layout -Recurse -File | Where-Object { $_.Extension -eq '.sys' -or $_.Name -match '^(winws2?|WinDivert.*|cygwin1)\.' }
+if ($bad) { throw "Pakette sürücü/Zapret dosyası var: $($bad.FullName -join ', ')" }
 
 # Simgeler: logo PNG'lerinden gereken boyutlar
 function Save-Scaled($src, $size, $dst) {

@@ -16,7 +16,7 @@ namespace DnsDegistirici
                 "&surum=" + Uri.EscapeDataString(AppVersion()) +
                 "&windows=" + Uri.EscapeDataString(WindowsVersion()) +
                 "&kurulum=" + Uri.EscapeDataString(Settings.Packaged ? "Microsoft Store" : "Klasik kurulum / kaynaktan derleme") +
-                "&zapret=" + Uri.EscapeDataString(ZapretInfo());
+                "&erisim=" + Uri.EscapeDataString(AccessInfo());
             if (!Launch(url)) Launch(RepoUrl + "/issues/new/choose");
         }
 
@@ -65,13 +65,12 @@ namespace DnsDegistirici
             catch (Exception) { return Environment.OSVersion.VersionString; }
         }
 
-        static string ZapretInfo()
+        static string AccessInfo()
         {
             try
             {
-                string sha = Zapret.CurrentVersion() ?? "";
-                if (sha.Length > 7) sha = sha.Substring(0, 7);
-                return (Zapret.IsRunning() ? "Çalışıyor" : "Kapalı") + (sha.Length > 0 ? " · motor " + sha : "");
+                return (DnsPilot.AppController.Instance.Bypass.Running ? "Etkin" : "Kapalı") +
+                       " · bölme " + Settings.Get("erisim.bolme", "TlsRecord");
             }
             catch (Exception) { return ""; }
         }

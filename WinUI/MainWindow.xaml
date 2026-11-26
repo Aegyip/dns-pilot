@@ -45,9 +45,9 @@
                         <ImageIcon><ImageIcon.Source><SvgImageSource UriSource="ms-appx:///Assets/Nav/dns.svg" RasterizePixelWidth="40" RasterizePixelHeight="40" /></ImageIcon.Source></ImageIcon>
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
-                <NavigationViewItem Content="Erişim" Tag="Zapret">
+                <NavigationViewItem Content="Erişim" Tag="Erisim">
                     <NavigationViewItem.Icon>
-                        <ImageIcon><ImageIcon.Source><SvgImageSource UriSource="ms-appx:///Assets/Nav/zapret.svg" RasterizePixelWidth="40" RasterizePixelHeight="40" /></ImageIcon.Source></ImageIcon>
+                        <ImageIcon><ImageIcon.Source><SvgImageSource UriSource="ms-appx:///Assets/Nav/access.svg" RasterizePixelWidth="40" RasterizePixelHeight="40" /></ImageIcon.Source></ImageIcon>
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
                 <NavigationViewItem Content="Sistem" Tag="Sistem">

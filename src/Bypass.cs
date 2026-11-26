@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 
 namespace DnsDegistirici
 {
-    // Sürücüsüz, şeffaf erişim (Zapret'in yerine; Microsoft Store sürücü içeren paket kabul etmiyor).
+    // Sürücüsüz, şeffaf erişim (Microsoft Store sürücü içeren paket kabul etmiyor).
     //
     // 1) Windows'un ad çözümleme ilkesine (NRPT) bir kural eklenir: yalnızca listedeki alan adları (discord.com …)
     //    bu uygulamanın yerel DNS sunucusuna (127.88.0.1:53) sorulur. Diğer tüm adlar her zamanki gibi çözülür.

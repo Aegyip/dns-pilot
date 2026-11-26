@@ -104,7 +104,7 @@ namespace DnsPilot.Pages
             });
         }
 
-        // Çalışan/sıradaki iş: sayfanın üstünde ilerleme çubuğu ve adım ("Zapret başlatılıyor: şifreli DNS sunucusu aranıyor…").
+        // Çalışan/sıradaki iş: sayfanın üstünde ilerleme çubuğu ve adım ("Erişim başlatılıyor: ad çözümleme kuralı ekleniyor…").
         // Önceden iş sürerken düğmeler sessizce soluklaşıyor, kullanıcı uygulamanın donduğunu sanıyordu.
         void ActivityBar(StackPanel s)
         {
@@ -115,7 +115,7 @@ namespace DnsPilot.Pages
                     IsClosable = false,
                     Severity = InfoBarSeverity.Warning,
                     Title = "Yönetici izni yok",
-                    Message = "DNS Pilot yönetici izniyle çalışmıyor; DNS ayarları değiştirilemez ve Zapret başlatılamaz.",
+                    Message = "DNS Pilot yönetici izniyle çalışmıyor; DNS ayarları değiştirilemez ve erişim başlatılamaz.",
                     ActionButton = Btn("Yönetici olarak yeniden başlat", App.RestartElevated),
                     Margin = new Thickness(0, 0, 0, 8),
                 });
@@ -193,31 +193,12 @@ namespace DnsPilot.Pages
             return tb;
         }
 
-        // Zapret motoru yüklü değilse gösterilen kart: soluk anahtar yerine "Motoru yükle".
-        protected SettingsCard EngineMissingCard()
+        // Son erişim hatası; kapatılana veya erişim başarıyla açılana kadar görünür kalır.
+        protected void AccessErrorBar(StackPanel s)
         {
-            object action;
-            if (App.EngineInstalling)
-                action = new StackPanel
-                {
-                    Orientation = Orientation.Horizontal, Spacing = 10,
-                    Children = { new ProgressRing { IsActive = true, Width = 20, Height = 20 }, new TextBlock { Text = "Yükleniyor…", VerticalAlignment = VerticalAlignment.Center } }
-                };
-            else
-                action = Btn("Motoru yükle", App.InstallEngine, true, true);
-            return Card("\uEA18", "Zapret",
-                App.State.EngineRemoved
-                    ? "Zapret dosyaları silinmiş. Bu genellikle antivirüsün winws2.exe / WinDivert dosyalarını karantinaya almasıyla olur. " +
-                      "Antivirüste şu klasörü istisnalara ekleyip motoru yeniden yükleyin: " + DnsDegistirici.Zapret.EngineDir
-                    : "Zapret motoru henüz yüklü değil. Erişim kısıtlamalarını aşabilmek için motoru yükleyin; birkaç saniye sürer.", action);
-        }
-
-        // Son Zapret hatası; kapatılana veya Zapret başarıyla açılana kadar görünür kalır.
-        protected void ZapretErrorBar(StackPanel s)
-        {
-            string error = App.ZapretError;
+            string error = App.AccessError;
             if (error == null) return;
-            if (error == DnsDegistirici.Zapret.ElevationMessage && !AppController.Elevated) return; // üstteki uyarı şeridi anlatıyor
+            if (error == AppController.AccessElevationMessage && !AppController.Elevated) return; // üstteki uyarı şeridi anlatıyor
             var bar = new InfoBar
             {
                 IsOpen = true,
@@ -227,7 +208,7 @@ namespace DnsPilot.Pages
                 Message = AppController.Clip(error, 900),
                 Margin = new Thickness(0, 4, 0, 0),
             };
-            bar.Closed += (sender, e) => App.ClearZapretError();
+            bar.Closed += (sender, e) => App.ClearAccessError();
             s.Children.Add(bar);
         }
         protected static void OpenInNotepad(string path)

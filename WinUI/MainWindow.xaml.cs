@@ -94,7 +94,7 @@ namespace DnsPilot
             switch (tag)
             {
                 case "DNS": page = typeof(Pages.DnsPage); break;
-                case "Zapret": page = typeof(Pages.ZapretPage); break;
+                case "Erisim": page = typeof(Pages.AccessPage); break;
                 case "Sistem": page = typeof(Pages.SystemPage); break;
                 case "Güncellemeler": page = typeof(Pages.UpdatesPage); break;
                 default: page = typeof(Pages.HomePage); break;

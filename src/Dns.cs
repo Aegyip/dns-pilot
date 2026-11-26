@@ -46,7 +46,7 @@ Google     | 8.8.8.8, 8.8.4.4 | 2001:4860:4860::8888, 2001:4860:4860::8844 | htt
 Quad9      | 9.9.9.9, 149.112.112.112 | 2620:fe::fe, 2620:fe::9 | https://dns.quad9.net/dns-query
 AdGuard (reklam engelli) | 94.140.14.14, 94.140.15.15 | 2a10:50c0::ad1:ff, 2a10:50c0::ad2:ff | https://dns.adguard-dns.com/dns-query
 
-# Zapret'in dnscrypt-proxy servisini kullanıyorsan başındaki # işaretini kaldır:
+# Yerel bir dnscrypt-proxy servisi kullanıyorsan başındaki # işaretini kaldır:
 # Yerel dnscrypt | 127.0.0.1 | ::1 |
 ";
 
@@ -146,7 +146,7 @@ AdGuard (reklam engelli) | 94.140.14.14, 94.140.15.15 | 2a10:50c0::ad1:ff, 2a10:
 
         // Hata yoksa null, varsa hata metni döner.
         // Şifreli DNS kesilirse Windows şifresiz DNS'e dönebilsin mi? Varsayılan: evet. Kapalıyken ("yalnızca şifreli")
-        // servis sağlayıcı DoH'yi kestiği anda (ör. Zapret durunca) her ad çözümlemesi zaman aşımını bekler; internet
+        // servis sağlayıcı DoH'yi kestiği anda her ad çözümlemesi zaman aşımını bekler; internet
         // çok yavaşlamış ya da kesilmiş gibi görünür.
         public static bool UdpFallback
         {
@@ -201,7 +201,7 @@ AdGuard (reklam engelli) | 94.140.14.14, 94.140.15.15 | 2a10:50c0::ad1:ff, 2a10:
             FlushCache();
             if (p.Doh != null && !useDoh)
                 log.Insert(0, "ISS şifreli DNS'i (" + new Uri(p.Doh).Host + ") engelliyor. " +
-                              "DNS şifresiz olarak ayarlandı. Zapret açıkken tekrar seçersen şifreli olur.\n");
+                              "DNS şifresiz olarak ayarlandı. Şifreli sunucuya yeniden erişilebildiğinde tekrar seçebilirsin.\n");
             return log.Length == 0 ? null : log.ToString();
         }
 

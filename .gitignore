@@ -1,4 +1,4 @@
-# Derleme çıktısı, kişisel ayarlar ve indirilen zapret motoru
+# Derleme çıktısı ve kişisel ayarlar
 bin/
 *.exe
 *.pdb
